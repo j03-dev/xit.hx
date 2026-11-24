@@ -48,7 +48,7 @@ All other keys are native Helix or xit buffer keymaps installed automatically.
 | Unstage file / section / selection | `u` |
 | Open commit editor | `c` |
 | Commit | type message, then `:w` |
-| Abort commit | `q` or `esc` |
+| Abort commit | `q` (Esc stays native and never aborts) |
 | Discard changes | `d`, then `y` to confirm |
 | View diff | `D` |
 | Open file | `ret` |

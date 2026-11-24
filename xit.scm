@@ -796,13 +796,13 @@
       "?"
       ":git-help")))
 
+;; Esc is deliberately left native here: repeated Esc presses collapse
+;; selections and clear cursors, and must not abort the commit. Use q to abort.
 (define XIT-COMMIT-KEYMAPS
   (hash
     "normal"
     (hash
       "q"
-      ":git-commit-abort"
-      "esc"
       ":git-commit-abort")))
 
 (define XIT-DIFF-KEYMAPS
