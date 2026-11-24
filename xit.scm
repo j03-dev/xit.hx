@@ -23,7 +23,6 @@
          git-discard
          git-open
          git-diff
-         git-diff-split
          git-resolve-ours
          git-resolve-theirs
          git-commit
@@ -60,7 +59,6 @@
          xit-discard
          xit-open
          xit-diff
-         xit-diff-split
          xit-resolve-ours
          xit-resolve-theirs
          xit-commit
@@ -321,12 +319,10 @@
           (emit! "Help (press '?' to hide):")
           (emit! "  s        Stage file/section, or every file in selection")
           (emit! "  u        Unstage file/section, or every file in selection")
-          (emit! "  -        Toggle stage/unstage")
           (emit! "  v/V/C-j  Select line(s), then s to stage or u to unstage")
-          (emit! "  d        Discard unstaged changes / delete untracked file")
+          (emit! "  d        Discard unstaged changes / delete untracked file (confirm y)")
           (emit! "  ret      Open file in editor (or show commit diff)")
-          (emit! "  g        Show diff in buffer")
-          (emit! "  D        Show diff in vertical split view")
+          (emit! "  D        Show diff in buffer")
           (emit! "  O        Resolve conflict using OURS version")
           (emit! "  T        Resolve conflict using THEIRS version")
           (emit! "  c        Open commit editor; :w writes and commits")
@@ -336,11 +332,11 @@
           (emit! "  P        Git push")
           (emit! "  p        Git pull")
           (emit! "  r        Refresh status")
-          (emit! "  w        Apply buffer edits (like oil)")
+          (emit! "  :git-save Apply edited buffer to git")
           (emit! "  q        Close git buffer")
           (emit! ""))
         (begin
-          (emit! "Keys:    [s] stage  [u] unstage  [-] toggle  [d] discard  [c] commit  [g] diff  [D] split diff  [v] select  [?] help")
+          (emit! "Keys:    [s] stage  [u] unstage  [d] discard (confirm)  [c] commit  [D] diff  [v] select  [?] help")
           (emit! "")))
 
     ;; Unmerged (Conflicts)
@@ -976,7 +972,6 @@
         (cond
           [(string=? subcmd "commit") (git-commit)]
           [(string=? subcmd "diff")   (git-diff)]
-          [(string=? subcmd "diff-split") (git-diff-split)]
           [(string=? subcmd "push")   (git-push)]
           [(string=? subcmd "pull")   (git-pull)]
           [(string=? subcmd "status") (Git)]
@@ -1118,18 +1113,27 @@
 (define (xit-unstage-all) (git-unstage-all))
 
 ;;@doc
-;; Discard changes for file or section under cursor
+;; Ask for confirmation before discarding changes under cursor
 (define (git-discard)
   (unless (git-buffer-alive?)
     (xit-error "No active git buffer"))
   (when (git-buffer-alive?)
     (let* ([target (current-buffer-target)]
-           [res (git-discard-target! *xit-dir* target)])
-      (if (hash-ref res 'success)
-          (begin
-            (xit-info (hash-ref res 'message))
-            (refresh-git-buffer!))
-          (xit-error (hash-ref res 'message))))))
+           [label (if (eq? (hash-ref target 'type) 'entry)
+                      (string-append "Discard " (hash-ref target 'path) "? type y to confirm: ")
+                      "Discard this section? type y to confirm: ")])
+      (push-component!
+        (prompt label
+          (lambda (answer)
+            (when (or (string=? answer "y") (string=? answer "Y")
+                      (string=? answer "yes") (string=? answer "YES"))
+              (let ([res (git-discard-target! *xit-dir* target)])
+                (if (hash-ref res 'success)
+                    (begin
+                      (xit-info (hash-ref res 'message))
+                      (refresh-git-buffer!))
+                    (xit-error (hash-ref res 'message))))))))))
+  void)
 
 (define (xit-discard) (git-discard))
 
@@ -1230,46 +1234,6 @@
 
 (define (xit-diff) (git-diff))
 
-;;@doc
-;; Show git diff in a vertical split view alongside current buffer
-(define (git-diff-split)
-  (unless (git-buffer-alive?)
-    (let ([cwd (get-helix-cwd)])
-      (when (git-repo? cwd)
-        (set! *xit-dir* (git-repo-root cwd)))))
-  (unless *xit-dir*
-    (xit-error "Not in a git repository"))
-  (when *xit-dir*
-    (let* ([target (if (git-buffer-alive?)
-                       (current-buffer-target)
-                       (hash 'type 'none))]
-           [diff-text (git-diff-target *xit-dir* target)])
-      (if (string=? (trim diff-text) "")
-          (xit-info "No diff to display")
-          (if (diff-buffer-alive?)
-              (begin
-                (editor-switch-action! *xit-diff-doc-id* (Action/VerticalSplit))
-                (select_all)
-                (replace-selection-with diff-text)
-                (collapse_selection)
-                (helix.goto-line 1)
-                (xit-set-buffer-language! "git-diff" "diff"))
-              (begin
-                (helix.new)
-                (enqueue-thread-local-callback
-                  (lambda ()
-                    (let* ([view-id (editor-focus)]
-                           [doc-id  (editor->doc-id view-id)])
-                      (set! *xit-diff-doc-id* doc-id)
-                      (set-scratch-buffer-name! XIT-DIFF-BUFFER-NAME)
-                      (xit-install-buffer-keymap! XIT-DIFF-BUFFER-NAME XIT-DIFF-KEYMAPS)
-                      (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-DIFF-BUFFER-NAME)
-                      (insert_string diff-text)
-                      (helix.goto-line 1)
-                      (xit-set-buffer-language! "git-diff" "diff")
-                      (editor-switch-action! doc-id (Action/VerticalSplit)))))))))))
-
-(define (xit-diff-split) (git-diff-split))
 
 ;; Path used for the Git-like commit editor. --path-format keeps this absolute
 ;; and works for worktrees too.
@@ -1311,7 +1275,7 @@
             "\n"
             "# Please enter the commit message for your changes. Lines starting\n"
             "# with '#' will be ignored, and an empty message aborts the commit.\n"
-            "# [w] or [:w] finishes the commit   [q] aborts\n"
+            "# [:w] finishes the commit   [q] aborts\n"
             "#\n"
             "# Changes to be committed:\n"
             (if (null? staged)
@@ -1566,11 +1530,9 @@
     (hash
       "s"    ":git-stage"
       "u"    ":git-unstage"
-      "-"    ":git-toggle-stage"
       "d"    ":git-discard"
       "ret"  ":git-open"
-      "g"    ":git-diff"
-      "D"    ":git-diff-split"
+      "D"    ":git-diff"
       "O"    ":git-resolve-ours"
       "T"    ":git-resolve-theirs"
       "c"    ":git-commit"
@@ -1580,7 +1542,6 @@
       "P"    ":git-push"
       "p"    ":git-pull"
       "r"    ":git-refresh"
-      "w"    ":git-save"
       "q"    ":git-close"
       "?"    ":git-help")))
 
@@ -1588,7 +1549,6 @@
   (hash
     "normal"
     (hash
-      "w"    ":git-commit-finish"
       "q"    ":git-commit-abort"
       "esc"  ":git-commit-abort")))
 

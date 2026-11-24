@@ -220,11 +220,9 @@
           (emit! "Help (press '?' to hide):")
           (emit! "  s        Stage file or section (or mark conflict resolved)")
           (emit! "  u        Unstage file or section")
-          (emit! "  -        Toggle stage/unstage")
-          (emit! "  x        Discard unstaged changes / delete untracked file")
+          (emit! "  d        Discard unstaged changes / delete untracked file")
           (emit! "  ret      Open file in editor (or show commit diff)")
-          (emit! "  d        Show diff in buffer")
-          (emit! "  D        Show diff in vertical split view")
+          (emit! "  D        Show diff in buffer")
           (emit! "  O        Resolve conflict using OURS version")
           (emit! "  T        Resolve conflict using THEIRS version")
           (emit! "  c        Open commit message buffer")
@@ -238,7 +236,7 @@
           (emit! "  q        Close git buffer")
           (emit! ""))
         (begin
-          (emit! "Keys:    [s] stage  [u] unstage  [-] toggle  [x] discard  [c] commit  [d] diff  [D] split diff  [?] help")
+          (emit! "Keys:    [s] stage  [u] unstage  [d] discard  [c] commit  [D] diff  [?] help")
           (emit! "")))
 
     ;; Unmerged (Conflicts)
