@@ -2,6 +2,8 @@
 
 A Helix-native Git UI written in Steel Scheme.
 
+![xit.hx Git status buffer](image.png)
+
 ## Install
 
 Requires Helix with Steel scripting support, `git`, `bash`, `python3`, and a C
