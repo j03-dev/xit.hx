@@ -1,0 +1,376 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/grammar.schema.json",
+  "name": "xit",
+  "rules": {
+    "source_file": {
+      "type": "REPEAT",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "head_line"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "repo_line"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "keys_line"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "help_line"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "section_unmerged"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "section_unstaged"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "section_staged"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "section_untracked"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "section_recent_commits"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "message_line"
+          }
+        ]
+      }
+    },
+    "head_line": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "Head:[^\\n\\r]*"
+        }
+      }
+    },
+    "repo_line": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "Repo:[^\\n\\r]*"
+        }
+      }
+    },
+    "keys_line": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "Keys:[^\\n\\r]*"
+        }
+      }
+    },
+    "help_line": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "  (s|u|v\\/V\\/C-j|d|ret|D|O|T|c|C|S|U|P|p|r|:git-save|q)[ \\t]{2,}[^\\n\\r]*"
+        }
+      }
+    },
+    "section_unmerged": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "section_unmerged_header"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "entry"
+          }
+        }
+      ]
+    },
+    "section_unstaged": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "section_unstaged_header"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "entry"
+          }
+        }
+      ]
+    },
+    "section_staged": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "section_staged_header"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "entry"
+          }
+        }
+      ]
+    },
+    "section_untracked": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "section_untracked_header"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "entry"
+          }
+        }
+      ]
+    },
+    "section_recent_commits": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "section_recent_commits_header"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "commit"
+          }
+        }
+      ]
+    },
+    "section_unmerged_header": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "Unmerged \\([0-9]+\\)"
+      }
+    },
+    "section_unstaged_header": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "Unstaged \\([0-9]+\\)"
+      }
+    },
+    "section_staged_header": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "Staged \\([0-9]+\\)"
+      }
+    },
+    "section_untracked_header": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "Untracked \\([0-9]+\\)"
+      }
+    },
+    "section_recent_commits_header": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "Recent Commits \\([0-9]+\\)"
+      }
+    },
+    "entry": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "PATTERN",
+          "value": "[ ]{2}"
+        },
+        {
+          "type": "FIELD",
+          "name": "status",
+          "content": {
+            "type": "SYMBOL",
+            "name": "git_status"
+          }
+        },
+        {
+          "type": "PATTERN",
+          "value": "[ ]{2}"
+        },
+        {
+          "type": "FIELD",
+          "name": "path",
+          "content": {
+            "type": "SYMBOL",
+            "name": "path"
+          }
+        }
+      ]
+    },
+    "git_status": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "status_unmerged"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "status_added"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "status_copied"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "status_deleted"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "status_modified"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "status_renamed"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "status_untracked"
+        }
+      ]
+    },
+    "status_unmerged": {
+      "type": "PATTERN",
+      "value": "(UU|UA|AU|UD|DU|AA|DD|U)"
+    },
+    "status_added": {
+      "type": "PATTERN",
+      "value": "A"
+    },
+    "status_copied": {
+      "type": "PATTERN",
+      "value": "C"
+    },
+    "status_deleted": {
+      "type": "PATTERN",
+      "value": "D"
+    },
+    "status_modified": {
+      "type": "PATTERN",
+      "value": "M"
+    },
+    "status_renamed": {
+      "type": "PATTERN",
+      "value": "R"
+    },
+    "status_untracked": {
+      "type": "PATTERN",
+      "value": "\\?"
+    },
+    "path": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[^\\n\\r]+"
+      }
+    },
+    "commit": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "PATTERN",
+          "value": "[ ]{2}"
+        },
+        {
+          "type": "FIELD",
+          "name": "hash",
+          "content": {
+            "type": "SYMBOL",
+            "name": "commit_hash"
+          }
+        },
+        {
+          "type": "PATTERN",
+          "value": "[ ]{2}"
+        },
+        {
+          "type": "FIELD",
+          "name": "subject",
+          "content": {
+            "type": "SYMBOL",
+            "name": "commit_subject"
+          }
+        }
+      ]
+    },
+    "commit_hash": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[0-9a-f]{7,40}"
+      }
+    },
+    "commit_subject": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[^\\n\\r]+"
+      }
+    },
+    "message_line": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": -1,
+        "content": {
+          "type": "PATTERN",
+          "value": "[^ \\n\\r][^\\n\\r]*"
+        }
+      }
+    }
+  },
+  "extras": [
+    {
+      "type": "STRING",
+      "value": "\n"
+    }
+  ],
+  "conflicts": [],
+  "precedences": [],
+  "externals": [],
+  "inline": [],
+  "supertypes": [],
+  "reserved": {}
+}

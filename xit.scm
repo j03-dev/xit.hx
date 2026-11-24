@@ -884,7 +884,7 @@
               (begin
                 (editor-switch-action! *xit-doc-id* (Action/Replace))
                 (refresh-git-buffer!)
-                (xit-set-buffer-language! "git-commit"))
+                (xit-set-buffer-language! "xit" "git-commit"))
               (begin
                 (helix.new)
                 (enqueue-thread-local-callback
@@ -896,7 +896,7 @@
                       (xit-install-buffer-keymap! XIT-BUFFER-NAME XIT-KEYMAPS)
                       (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-BUFFER-NAME)
                       (refresh-git-buffer! 4)
-                      (xit-set-buffer-language! "git-commit"))))))))))
+                      (xit-set-buffer-language! "xit" "git-commit"))))))))))
 
 ;; Get the target under the current cursor in *git* buffer
 (define (current-buffer-target)

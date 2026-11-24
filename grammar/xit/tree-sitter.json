@@ -1,0 +1,27 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "xit",
+      "camelcase": "Xit",
+      "title": "Xit",
+      "scope": "source.xit",
+      "file-types": [],
+      "class-name": "TreeSitterXit"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for xit.hx status buffers",
+    "authors": [],
+    "links": {
+      "repository": "https://github.com/manohy/xit.hx"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "node": false,
+    "rust": false
+  }
+}

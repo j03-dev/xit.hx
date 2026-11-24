@@ -1,0 +1,12 @@
+# Added by xit.hx installer
+[[language]]
+name = "xit"
+scope = "source.xit"
+file-types = []
+grammar = "xit"
+comment-token = "#"
+indent = { tab-width = 2, unit = "  " }
+
+[[grammar]]
+name = "xit"
+source = { path = "@XIT_GRAMMAR_PATH@" }
