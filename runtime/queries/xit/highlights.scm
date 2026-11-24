@@ -45,7 +45,8 @@
 (section_staged (entry (path) @diff.plus))
 (section_untracked (entry (path) @string.special.path))
 
-;; Recent commits
+;; Recent commits: hashes use a distinct capture from subjects (usually blue)
+;; so they stand out instead of sharing the yellow heading color.
 (commit_hash)
-@constant.numeric
+@function
 (section_recent_commits (commit (commit_subject) @markup.heading))
