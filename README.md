@@ -13,9 +13,10 @@ cd xit.hx
 ./install.sh
 ```
 
-The installer copies `xit.scm` and `notify.hx` into your Steel cogs, installs
-the `xit` query, registers the language, and builds the grammar. There is no
-separate core module to load. It does not edit Helix source. Restart Helix after
+The installer copies `xit.scm` and its Git layer `xit-core.scm` into your Steel
+cogs, installs `notify.hx`, the `xit` query, language registration, and builds
+the grammar. You only require `xit.scm`; the core module is loaded from the same
+directory automatically. It does not edit Helix source. Restart Helix after
 installing.
 
 ## Helix config
