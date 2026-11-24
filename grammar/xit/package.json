@@ -1,0 +1,11 @@
+{
+  "name": "tree-sitter-xit",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for xit.hx status buffers",
+  "tree-sitter": [
+    {
+      "scope": "source.xit",
+      "file-types": []
+    }
+  ]
+}
