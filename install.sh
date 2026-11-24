@@ -43,9 +43,11 @@ fi
 # Install the Steel plugin and its grammar/runtime assets.
 mkdir -p "$COG_DIR"
 cp "$SCRIPT_DIR/xit.scm" "$COG_DIR/xit.scm"
-cp "$SCRIPT_DIR/xit-core.scm" "$COG_DIR/xit-core.scm"
 cp "$SCRIPT_DIR/cog.scm" "$COG_DIR/cog.scm"
 cp "$SCRIPT_DIR/README.md" "$COG_DIR/README.md"
+
+# Old installs may still have the removed test-only core module.
+rm -f "$COG_DIR/xit-core.scm"
 
 rm -rf "$COG_DIR/grammar" "$COG_DIR/languages" "$COG_DIR/runtime"
 cp -R "$SCRIPT_DIR/grammar" "$COG_DIR/grammar"
