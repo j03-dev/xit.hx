@@ -10,10 +10,17 @@ An interactive Git status, buffer management, and conflict resolution plugin for
 ./install.sh
 ```
 
-The installer copies the Steel plugin to your Helix cogs directory, installs the
-`xit` tree-sitter query, registers the `xit` language in
-`~/.config/helix/languages.toml`, and builds the grammar with `hx --grammar build`.
-Restart Helix after installing.
+Requires `bash`, `python3`, and a C compiler (`cc` by default, or set `CC`).
+
+The installer:
+
+- copies the Steel plugin to `$XDG_DATA_HOME/steel/cogs/xit`
+  (default `~/.local/share/steel/cogs/xit`),
+- installs the `xit` query into `$XDG_CONFIG_HOME/helix/runtime/queries/xit`,
+- registers the `xit` language in `$XDG_CONFIG_HOME/helix/languages.toml`,
+- compiles only `xit.so` into `$XDG_CONFIG_HOME/helix/runtime/grammars`.
+
+It does not modify the Helix source tree. Restart Helix after installing.
 
 ---
 
@@ -115,5 +122,6 @@ and `:git-unstage-selection`.
 
 Languages are applied automatically: `*git*` (status) uses the custom `xit`
 grammar, `*git-commit*` uses `git-commit`, and `*git-diff*` uses `diff`. The
-`xit` grammar highlights commit hashes, commit subjects, and staged/unstaged
-entries without running `:lang` manually.
+`xit` grammar highlights commit hashes, commit subjects, section headers, and
+staged/unstaged/untracked entries without running `:lang` manually. If the
+`xit` language is not installed, `*git*` falls back to `git-commit` highlighting.
