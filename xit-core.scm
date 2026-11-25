@@ -44,6 +44,11 @@
 (define (path-join base name)
   (string-append base (path-separator) name))
 
+;; Git pathspecs interpret glob and magic syntax. Mark every path argument as
+;; literal so spaces, brackets, leading '!' and leading ':' are just characters.
+(define (git-pathspec path)
+  (string-append ":(literal)" path))
+
 ;; Execute a git command in the given directory
 (define (git-exec dir args)
   (let ([proc (~> (command "git" (cons "-C" (cons dir args)))
@@ -152,43 +157,50 @@
             'behind
             0))])))
 
-;; Parse git status --porcelain=v1 -uall output into staged, unstaged, untracked, unmerged
+;; Parse `git status --porcelain=v1 -b -uall -z` output. NUL delimiting avoids
+;; Git's C-style quoting, so paths with spaces or Unicode stay byte-exact.
 (define (parse-porcelain-status output)
-  (let* ([lines (filter (lambda (l) (> (string-length l) 0))
-                 (split-many output "\n"))]
+  (let* ([records (filter (lambda (r) (> (string-length r) 0))
+                   (split-many output (string (integer->char 0))))]
          [branch-info (hash 'branch "HEAD" 'status "unknown" 'upstream #false 'ahead 0 'behind 0)]
          [staged '()]
          [unstaged '()]
          [untracked '()]
          [unmerged '()])
-    (for-each
-      (lambda (line)
-        (cond
-          [(starts-with? line "## ")
-            (set! branch-info (parse-branch-header line))]
-          [(>= (string-length line) 3)
-            (let* ([x (string-ref line 0)]
-                   [y (string-ref line 1)]
-                   [raw-path (trim (substring line 3 (string-length line)))]
-                   [path (if (and (char=? x #\R) (string-contains? raw-path " -> "))
-                          (list-ref (split-many raw-path " -> ") 1)
-                          raw-path)])
-              (cond
-                ;; Unmerged / conflicted
-                [(or (char=? x #\U) (char=? y #\U)
-                    (and (char=? x #\A) (char=? y #\A))
-                    (and (char=? x #\D) (char=? y #\D)))
-                  (set! unmerged (cons (cons (string x y) path) unmerged))]
-                ;; Untracked
-                [(and (char=? x #\?) (char=? y #\?))
-                  (set! untracked (cons path untracked))]
-                ;; Staged and/or Unstaged
-                [else
-                  (when (member x '(#\M #\A #\D #\R #\C))
-                    (set! staged (cons (cons (string x) raw-path) staged)))
-                  (when (member y '(#\M #\D))
-                    (set! unstaged (cons (cons (string y) path) unstaged)))]))]))
-      lines)
+    (let loop ([items records])
+      (when (pair? items)
+        (let ([record (car items)]
+              [rest (cdr items)])
+          (cond
+            [(starts-with? record "## ")
+              (set! branch-info (parse-branch-header record))
+              (loop rest)]
+            [(>= (string-length record) 4)
+              (let* ([x (string-ref record 0)]
+                     [y (string-ref record 1)]
+                     ;; record = "XY PATH"; no trim, so spaces are preserved.
+                     [path (substring record 3 (string-length record))]
+                     ;; Renames/copies carry the original path in the next field.
+                     [next (if (or (char=? x #\R) (char=? y #\R)
+                                (char=? x #\C)
+                                (char=? y #\C))
+                            (if (pair? rest) (cdr rest) rest)
+                            rest)]
+                     [status (string x y)])
+                (cond
+                  [(or (char=? x #\U) (char=? y #\U)
+                      (and (char=? x #\A) (char=? y #\A))
+                      (and (char=? x #\D) (char=? y #\D)))
+                    (set! unmerged (cons (cons status path) unmerged))]
+                  [(and (char=? x #\?) (char=? y #\?))
+                    (set! untracked (cons path untracked))]
+                  [else
+                    (when (member x '(#\M #\A #\D #\R #\C))
+                      (set! staged (cons (cons (string x) path) staged)))
+                    (when (member y '(#\M #\D))
+                      (set! unstaged (cons (cons (string y) path) unstaged)))])
+                (loop next))]
+            [else (loop rest)]))))
     (hash 'branch branch-info
       'staged
       (reverse staged)
@@ -212,7 +224,7 @@
 
 ;; Get all git status entries for a repo
 (define (git-status-entries dir)
-  (let ([res (git-exec dir '("status" "--porcelain=v1" "-b" "-uall"))])
+  (let ([res (git-exec dir '("status" "--porcelain=v1" "-b" "-uall" "-z"))])
     (if (hash-ref res 'ok)
       (parse-porcelain-status (hash-ref res 'stdout))
       (hash 'branch (hash 'branch "HEAD" 'status "error" 'upstream #false 'ahead 0 'behind 0)
@@ -352,28 +364,36 @@
 
     (string-join (reverse out-lines) "\n")))
 
+;; Entry lines are always "<marker><status>  <path>", where <marker> is "> ",
+;; "v " or two spaces. Slice by fixed offsets instead of split-whitespace so
+;; paths with spaces (including leading/trailing spaces) stay byte-exact.
+(define (entry-status-text line)
+  (if (< (string-length line) 2)
+    ""
+    (let ([parts (split-whitespace (substring line 2 (string-length line)))])
+      (if (null? parts) "" (car parts)))))
+
+(define (entry-path-from-line line)
+  (let ([start (+ 2 (string-length (entry-status-text line)) 2)])
+    (if (<= (string-length line) start)
+      ""
+      (substring line start (string-length line)))))
+
 ;; Parse line target from buffer lines and 0-indexed line number
 (define (parse-line-target lines line-n)
   (if (or (< line-n 0) (>= line-n (length lines)))
     (hash 'type 'none)
     (let ([line (list-ref lines line-n)])
       (define (entry-from section)
-        (let* ([trimmed (trim (substring line 2 (string-length line)))]
-               [parts (split-whitespace trimmed)]
-               [status (car parts)]
-               [raw-path (trim (substring trimmed
-                                (string-length status)
-                                (string-length trimmed)))])
+        (let ([status (entry-status-text line)]
+              [raw-path (entry-path-from-line line)])
           (hash 'type 'entry
             'section
             section
             'status
             status
             'path
-            (if (and (eq? section 'staged) (string=? status "R")
-                 (string-contains? raw-path " -> "))
-              (list-ref (split-many raw-path " -> ") 1)
-              raw-path)
+            raw-path
             'raw-path
             raw-path)))
       (cond
@@ -427,7 +447,7 @@
               [path (hash-ref target 'path)])
           (cond
             [(or (eq? sec 'unstaged) (eq? sec 'untracked) (eq? sec 'unmerged))
-              (let ([res (git-exec dir (list "add" "--" path))])
+              (let ([res (git-exec dir (list "add" "--" (git-pathspec path)))])
                 (if (hash-ref res 'ok)
                   (hash 'success #true 'message (string-append "Staged: " path))
                   (hash 'success #false 'message (hash-ref res 'stderr))))]
@@ -464,8 +484,8 @@
               [path (hash-ref target 'path)])
           (if (eq? sec 'staged)
             (let ([res (if (git-has-commits? dir)
-                        (git-exec dir (list "restore" "--staged" "--" path))
-                        (git-exec dir (list "rm" "--cached" "-q" "--" path)))])
+                        (git-exec dir (list "restore" "--staged" "--" (git-pathspec path)))
+                        (git-exec dir (list "rm" "--cached" "-q" "--" (git-pathspec path))))])
               (if (hash-ref res 'ok)
                 (hash 'success #true 'message (string-append "Unstaged: " path))
                 (hash 'success #false 'message (hash-ref res 'stderr))))
@@ -502,7 +522,7 @@
                 (set! skipped (+ skipped 1))]
               [(member path staged) (set! skipped (+ skipped 1))]
               [else
-                (let ([res (git-exec dir (list "add" "--" path))])
+                (let ([res (git-exec dir (list "add" "--" (git-pathspec path)))])
                   (if (hash-ref res 'ok)
                     (set! staged (cons path staged))
                     (set! errors
@@ -543,8 +563,8 @@
               [(member path unstaged) (set! skipped (+ skipped 1))]
               [else
                 (let ([res (if (git-has-commits? dir)
-                            (git-exec dir (list "restore" "--staged" "--" path))
-                            (git-exec dir (list "rm" "--cached" "-q" "--" path)))])
+                            (git-exec dir (list "restore" "--staged" "--" (git-pathspec path)))
+                            (git-exec dir (list "rm" "--cached" "-q" "--" (git-pathspec path))))])
                   (if (hash-ref res 'ok)
                     (set! unstaged (cons path unstaged))
                     (set! errors
@@ -594,20 +614,20 @@
               [path (hash-ref target 'path)])
           (cond
             [(eq? sec 'unstaged)
-              (let ([res (git-exec dir (list "restore" "--" path))])
+              (let ([res (git-exec dir (list "restore" "--" (git-pathspec path)))])
                 (if (hash-ref res 'ok)
                   (hash 'success #true 'message (string-append "Discarded changes in: " path))
                   (hash 'success #false 'message (hash-ref res 'stderr))))]
             [(eq? sec 'untracked)
-              (let ([res (git-exec dir (list "clean" "-f" "-d" "--" path))])
+              (let ([res (git-exec dir (list "clean" "-f" "-d" "--" (git-pathspec path)))])
                 (if (hash-ref res 'ok)
                   (hash 'success #true 'message (string-append "Deleted untracked file: " path))
                   (hash 'success #false 'message (hash-ref res 'stderr))))]
             [(eq? sec 'staged)
               (let* ([_ (if (git-has-commits? dir)
-                         (git-exec dir (list "restore" "--staged" "--" path))
-                         (git-exec dir (list "rm" "--cached" "-q" "--" path)))]
-                     [res (git-exec dir (list "restore" "--" path))])
+                         (git-exec dir (list "restore" "--staged" "--" (git-pathspec path)))
+                         (git-exec dir (list "rm" "--cached" "-q" "--" (git-pathspec path))))]
+                     [res (git-exec dir (list "restore" "--" (git-pathspec path)))])
                 (if (hash-ref res 'ok)
                   (hash 'success #true 'message (string-append "Discarded staged changes in: " path))
                   (hash 'success #false 'message (hash-ref res 'stderr))))]
@@ -663,13 +683,13 @@
               [path (hash-ref target 'path)])
           (cond
             [(eq? sec 'staged)
-              (let ([res (git-exec dir (list "diff" "--staged" "--" path))])
+              (let ([res (git-exec dir (list "diff" "--staged" "--" (git-pathspec path)))])
                 (hash-ref res 'stdout))]
             [(eq? sec 'unstaged)
-              (let ([res (git-exec dir (list "diff" "--" path))])
+              (let ([res (git-exec dir (list "diff" "--" (git-pathspec path)))])
                 (hash-ref res 'stdout))]
             [(eq? sec 'unmerged)
-              (let ([res (git-exec dir (list "diff" "--" path))])
+              (let ([res (git-exec dir (list "diff" "--" (git-pathspec path)))])
                 (hash-ref res 'stdout))]
             [(eq? sec 'untracked)
               (let ([res (git-exec dir (list "diff" "--no-index" "/dev/null" path))])
@@ -704,9 +724,9 @@
 
 ;; Resolve conflict using OURS version and stage
 (define (git-resolve-ours! dir path)
-  (let ([res1 (git-exec dir (list "checkout" "--ours" "--" path))])
+  (let ([res1 (git-exec dir (list "checkout" "--ours" "--" (git-pathspec path)))])
     (if (hash-ref res1 'ok)
-      (let ([res2 (git-exec dir (list "add" "--" path))])
+      (let ([res2 (git-exec dir (list "add" "--" (git-pathspec path)))])
         (if (hash-ref res2 'ok)
           (hash 'success #true 'message (string-append "Resolved (OURS): " path))
           (hash 'success #false 'message (hash-ref res2 'stderr))))
@@ -714,34 +734,23 @@
 
 ;; Resolve conflict using THEIRS version and stage
 (define (git-resolve-theirs! dir path)
-  (let ([res1 (git-exec dir (list "checkout" "--theirs" "--" path))])
+  (let ([res1 (git-exec dir (list "checkout" "--theirs" "--" (git-pathspec path)))])
     (if (hash-ref res1 'ok)
-      (let ([res2 (git-exec dir (list "add" "--" path))])
+      (let ([res2 (git-exec dir (list "add" "--" (git-pathspec path)))])
         (if (hash-ref res2 'ok)
           (hash 'success #true 'message (string-append "Resolved (THEIRS): " path))
           (hash 'success #false 'message (hash-ref res2 'stderr))))
       (hash 'success #false 'message (hash-ref res1 'stderr)))))
 
-;; Extract entry path from a line (fold markers and diff bodies are ignored)
+;; Extract entry path from a line. Fold markers and diff bodies are ignored;
+;; entry paths are returned exactly as displayed, including spaces.
 (define (extract-entry-path line)
-  (cond
-    [(or (starts-with? line "    ") (not (or (starts-with? line "> ")
-                                          (starts-with? line "v ")
-                                          (starts-with? line "  "))))
-      #false]
-    [else
-      (let* ([raw-line (if (or (starts-with? line "> ") (starts-with? line "v "))
-                        (substring line 2 (string-length line))
-                        line)]
-             [trimmed (trim raw-line)]
-             [parts (split-whitespace trimmed)])
-        (if (null? parts)
-          #false
-          (let* ([status (car parts)]
-                 [raw (trim (substring trimmed (string-length status) (string-length trimmed)))])
-            (if (and (string=? status "R") (string-contains? raw " -> "))
-              (list-ref (split-many raw " -> ") 1)
-              raw))))]))
+  (if (or (starts-with? line "    ")
+       (not (or (starts-with? line "> ")
+             (starts-with? line "v ")
+             (starts-with? line "  "))))
+    #false
+    (entry-path-from-line line)))
 
 ;; Parse buffer lines into section buckets: staged, unstaged, untracked, unmerged
 (define (parse-buffer-sections lines)
