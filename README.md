@@ -2,7 +2,13 @@
 
 A Helix-native Git UI written in Steel Scheme.
 
-![xit.hx Git status buffer](image.png)
+## Screenshots
+
+![xit.hx Git status buffer](images/Screenshot%20from%202026-11-24%2018-18-08.png)
+
+![xit.hx selection workflow](images/Screenshot%20from%202026-11-25%2015-07-14.png)
+
+![xit.hx folded inline diff](images/Screenshot%20from%202026-11-25%2015-07-35.png)
 
 ## Install
 
@@ -38,6 +44,8 @@ This is the only config needed in `~/.config/helix/init.scm`:
 the `require` line and run `:Git` manually.
 
 All other keys are native Helix or xit buffer keymaps installed automatically.
+File paths containing spaces, Unicode characters, or glob-like characters are
+handled literally, so no manual quoting is needed.
 
 ## Use
 
