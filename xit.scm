@@ -58,6 +58,12 @@
 (define XIT-COMMIT-BUFFER-NAME "*git-commit*")
 (define XIT-DIFF-BUFFER-NAME "*git-diff*")
 
+;; Git's standard scissors line. Everything below it in the commit editor is a
+;; display-only staged diff preview; Helix's git-commit grammar injects the diff
+;; highlighter here, and xit truncates the message before passing it to git.
+(define XIT-COMMIT-DIFF-SEPARATOR
+  "# ------------------------ >8 ------------------------")
+
 (define GIT-BUFFER-NAME XIT-BUFFER-NAME)
 (define GIT-COMMIT-BUFFER-NAME XIT-COMMIT-BUFFER-NAME)
 (define GIT-DIFF-BUFFER-NAME XIT-DIFF-BUFFER-NAME)
@@ -560,6 +566,18 @@
                     "")]
          [st (git-status-entries *xit-dir*)]
          [staged (hash-ref st 'staged)]
+         [staged-diff
+           (trim
+             (string-join
+               (filter (lambda (text) (not (string=? (trim text) "")))
+                 (map (lambda (item)
+                       (git-diff-target *xit-dir*
+                         (hash 'type 'entry 'section 'staged
+                           'path
+                           (extract-entry-path
+                             (string-append "  " (car item) "  " (cdr item))))))
+                   staged))
+               "\n"))]
          [template
            (string-append
              (if (string=? prev-msg "") "" (string-append prev-msg "\n\n"))
@@ -567,12 +585,16 @@
              "# Please enter the commit message for your changes. Lines starting\n"
              "# with '#' will be ignored, and an empty message aborts the commit.\n"
              "# [:w] finishes the commit   [q] aborts\n"
+             "# The staged diff below the separator is display-only.\n"
              "#\n"
              "# Changes to be committed:\n"
              (if (null? staged)
                "#   (none)\n"
                (string-join (map (lambda (p) (string-append "#   " (car p) "  " (cdr p))) staged) "\n"))
-             "\n")])
+             "\n"
+             (if (string=? staged-diff "")
+               ""
+               (string-append "\n" XIT-COMMIT-DIFF-SEPARATOR "\n" staged-diff "\n")))])
     (set! *xit-commit-path* path)
     (xit-write-commit-file! path template)
     (if (commit-buffer-alive?)
@@ -622,6 +644,17 @@
       (open-commit-buffer! #true)
       (xit-error "No existing commits to amend"))))
 
+;; Only the part above the diff separator is a commit message. Everything
+;; below it is a display-only preview of the staged diff.
+(define (commit-message-lines lines)
+  (let loop ([remaining lines] [acc '()])
+    (cond
+      [(null? remaining) (reverse acc)]
+      [(or (string=? (trim (car remaining)) XIT-COMMIT-DIFF-SEPARATOR)
+          (starts-with? (car remaining) "diff --git "))
+        (reverse acc)]
+      [else (loop (cdr remaining) (cons (car remaining) acc))])))
+
 ;;@doc
 ;; Finalize and create commit from commit buffer. Also used by the
 ;; document-saved hook when the user presses :w in the commit editor.
@@ -637,7 +670,7 @@
         void)
       (let* ([rope (editor->text *xit-commit-doc-id*)]
              [text (text.rope->string rope)]
-             [lines (split-many text "\n")]
+             [lines (commit-message-lines (split-many text "\n"))]
              [content-lines (filter (lambda (l)
                                      (let ([t (trim l)])
                                        (not (or (starts-with? t "#") (string=? t "")))))
