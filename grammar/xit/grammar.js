@@ -2,7 +2,7 @@ module.exports = grammar({
   name: "xit",
 
   // Newlines only separate lines; leading spaces are significant because xit
-  // uses two-space indentation for file and commit entries.
+  // uses two-space indentation for file, branch and commit entries.
   extras: $ => ["\n"],
 
   rules: {
@@ -17,7 +17,13 @@ module.exports = grammar({
           $.section_unstaged,
           $.section_staged,
           $.section_untracked,
-          $.section_recent_commits,
+          $.section_recent_commits_header,
+          $.section_commit_graph_header,
+          $.section_branches_header,
+          $.section_graph_header,
+          $.commit,
+          $.graph_rail_line,
+          $.branch_line,
           $.diff_line,
           $.message_line
         )
@@ -31,7 +37,7 @@ module.exports = grammar({
       token(
         prec(
           2,
-          /  (s|u|v\/V\/C-j|d|ret\/tab|o|D|O|T|c|C|S|U|P|p|r|:git-save|q)[ \t]{2,}[^\n\r]*/
+          /  (o[ \t]{6,}|(:git-save)[ \t]{1,}|(s|u|v\/V\/C-j|d|ret\/tab|D|O|T|c|C|S|U|P|p|b|r|q)[ \t]{2,})[^\n\r]*/
         )
       ),
 
@@ -39,14 +45,14 @@ module.exports = grammar({
     section_unstaged: $ => seq($.section_unstaged_header, repeat($.entry)),
     section_staged: $ => seq($.section_staged_header, repeat($.entry)),
     section_untracked: $ => seq($.section_untracked_header, repeat($.entry)),
-    section_recent_commits: $ =>
-      seq($.section_recent_commits_header, repeat($.commit)),
-
     section_unmerged_header: $ => token(/Unmerged \([0-9]+\)/),
     section_unstaged_header: $ => token(/Unstaged \([0-9]+\)/),
     section_staged_header: $ => token(/Staged \([0-9]+\)/),
     section_untracked_header: $ => token(/Untracked \([0-9]+\)/),
     section_recent_commits_header: $ => token(/Recent Commits \([0-9]+\)/),
+    section_commit_graph_header: $ => token(/Commit Graph \([0-9]+\)/),
+    section_branches_header: $ => token(/Branches \([0-9]+\)/),
+    section_graph_header: $ => token(/Branch Graph/),
 
     entry: $ =>
       seq(
@@ -85,14 +91,25 @@ module.exports = grammar({
 
     commit: $ =>
       seq(
-        /[ ]{2}/,
+        field("graph", $.graph_prefix),
         field("hash", $.commit_hash),
-        /[ ]{2}/,
+        /[ ]/,
+        field("author", $.commit_author),
+        $.author_marker,
+        /[ ]/,
         field("subject", $.commit_subject)
       ),
 
+    graph_rail_line: $ => field("graph", $.graph_prefix),
+
+    graph_prefix: () => token(/[*o|\\\/ ]+/),
     commit_hash: () => token(/[0-9a-f]{7,40}/),
+    author_marker: () => token(/\u200B/),
+    commit_author: () => token(/[^\u200B\n\r]+/),
     commit_subject: () => token(/[^\n\r]+/),
+
+    branch_line: () =>
+      token(prec(3, /(\*|  )[^\n\r]* ↑[0-9]+ ↓[0-9]+ [^\n\r]*/)),
 
     message_line: () => token(prec(-1, /[^ \n\r][^\n\r]*/)),
   },

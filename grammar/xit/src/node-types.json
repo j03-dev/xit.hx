@@ -3,6 +3,26 @@
     "type": "commit",
     "named": true,
     "fields": {
+      "author": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "commit_author",
+            "named": true
+          }
+        ]
+      },
+      "graph": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "graph_prefix",
+            "named": true
+          }
+        ]
+      },
       "hash": {
         "multiple": false,
         "required": true,
@@ -23,6 +43,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "author_marker",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -119,28 +149,25 @@
     }
   },
   {
+    "type": "graph_rail_line",
+    "named": true,
+    "fields": {
+      "graph": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "graph_prefix",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "path",
     "named": true,
     "fields": {}
-  },
-  {
-    "type": "section_recent_commits",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "commit",
-          "named": true
-        },
-        {
-          "type": "section_recent_commits_header",
-          "named": true
-        }
-      ]
-    }
   },
   {
     "type": "section_staged",
@@ -228,7 +255,19 @@
       "required": false,
       "types": [
         {
+          "type": "branch_line",
+          "named": true
+        },
+        {
+          "type": "commit",
+          "named": true
+        },
+        {
           "type": "diff_line",
+          "named": true
+        },
+        {
+          "type": "graph_rail_line",
           "named": true
         },
         {
@@ -252,7 +291,19 @@
           "named": true
         },
         {
-          "type": "section_recent_commits",
+          "type": "section_branches_header",
+          "named": true
+        },
+        {
+          "type": "section_commit_graph_header",
+          "named": true
+        },
+        {
+          "type": "section_graph_header",
+          "named": true
+        },
+        {
+          "type": "section_recent_commits_header",
           "named": true
         },
         {
@@ -275,6 +326,18 @@
     }
   },
   {
+    "type": "author_marker",
+    "named": true
+  },
+  {
+    "type": "branch_line",
+    "named": true
+  },
+  {
+    "type": "commit_author",
+    "named": true
+  },
+  {
     "type": "commit_hash",
     "named": true
   },
@@ -288,6 +351,10 @@
   },
   {
     "type": "diff_del",
+    "named": true
+  },
+  {
+    "type": "graph_prefix",
     "named": true
   },
   {
@@ -308,6 +375,18 @@
   },
   {
     "type": "repo_line",
+    "named": true
+  },
+  {
+    "type": "section_branches_header",
+    "named": true
+  },
+  {
+    "type": "section_commit_graph_header",
+    "named": true
+  },
+  {
+    "type": "section_graph_header",
     "named": true
   },
   {

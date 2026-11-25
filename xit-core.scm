@@ -30,6 +30,17 @@
   git-diff-target
   git-push!
   git-pull!
+  git-branch-list
+  git-branch-create!
+  git-branch-checkout!
+  git-branch-delete!
+  git-branch-merge!
+  git-branch-diff
+  commit-display-lines
+  commits-display-lines
+  format-branch-buffer
+  format-graph-buffer
+  parse-branch-line
   git-resolve-ours!
   git-resolve-theirs!
   extract-entry-path
@@ -48,6 +59,96 @@
 ;; literal so spaces, brackets, leading '!' and leading ':' are just characters.
 (define (git-pathspec path)
   (string-append ":(literal)" path))
+
+;; Small helpers shared by the graph and branch renderers.
+(define (all-but-last items)
+  (if (null? items)
+    '()
+    (reverse (cdr (reverse items)))))
+
+(define (digit-value ch)
+  (let ([n (- (char->integer ch) 48)])
+    (if (and (>= n 0) (<= n 9)) n #false)))
+
+(define (xit-string->number value)
+  (let loop ([i 0] [acc 0])
+    (if (>= i (string-length value))
+      acc
+      (let ([d (digit-value (string-ref value i))])
+        (if d
+          (loop (+ i 1) (+ (* acc 10) d))
+          acc)))))
+
+(define (number-after-token text token)
+  (let loop ([parts (split-whitespace text)])
+    (cond
+      [(null? parts) 0]
+      [(string=? (car parts) token)
+        (if (pair? (cdr parts)) (xit-string->number (cadr parts)) 0)]
+      [else (loop (cdr parts))])))
+
+;; Fixed-width columns used by the branch and commit views.
+(define (pad-right text width)
+  (let ([n (string-length text)])
+    (if (>= n width)
+      text
+      (string-append text (make-string (- width n) #\space)))))
+
+(define (max-string-length values)
+  (let loop ([remaining values] [best 0])
+    (if (null? remaining)
+      best
+      (loop (cdr remaining)
+        (max best (string-length (car remaining)))))))
+
+(define (hex-char? ch)
+  (or (digit-value ch)
+    (let ([n (char->integer ch)])
+      (or (and (>= n 97) (<= n 102))
+        (and (>= n 65) (<= n 70))))))
+
+;; Find the first hex hash in a rendered commit line. Graph glyphs and the
+;; author/subject come after it, so the first 7-40 char hex run is the hash.
+(define (commit-hash-from-line line)
+  (let ([len (string-length line)])
+    (let loop ([i 0])
+      (cond
+        [(>= i len) #false]
+        [(hex-char? (string-ref line i))
+          (let scan ([j i])
+            (if (and (< j len) (hex-char? (string-ref line j)))
+              (scan (+ j 1))
+              (let ([candidate (substring line i j)])
+                (if (and (>= (string-length candidate) 7)
+                     (<= (string-length candidate) 40))
+                  candidate
+                  (loop j)))))]
+        [else (loop (+ i 1))]))))
+
+(define (commit-subject-from-line line)
+  (let ([hash (commit-hash-from-line line)]
+        [len (string-length line)]
+        [zwsp (integer->char 8203)])
+    (if hash
+      (let ([hash-len (string-length hash)])
+        (let loop ([i 0])
+          (cond
+            [(> (+ i hash-len) len) ""]
+            [(string=? (substring line i (+ i hash-len)) hash)
+              (let* ([start (+ i hash-len 1)]
+                     [rest (substring line start len)]
+                     [rest-len (string-length rest)])
+                (let find-marker ([j 0])
+                  (cond
+                    [(>= j rest-len) rest]
+                    [(char=? (string-ref rest j) zwsp)
+                      (let ([subject-start (+ j 2)])
+                        (if (< subject-start rest-len)
+                          (substring rest subject-start rest-len)
+                          ""))]
+                    [else (find-marker (+ j 1))])))]
+            [else (loop (+ i 1))])))
+      "")))
 
 ;; Execute a git command in the given directory
 (define (git-exec dir args)
@@ -105,17 +206,8 @@
 (define (parse-branch-header line)
   (let ([raw (trim (substring line 2 (string-length line)))])
     (cond
-      [(starts-with? raw "No commits yet on ")
-        (hash 'branch (substring raw 18 (string-length raw))
-          'status
-          "No commits yet"
-          'upstream
-          #false
-          'ahead
-          0
-          'behind
-          0)]
-      [(starts-with? raw "Initial commit on ")
+      [(or (starts-with? raw "No commits yet on ")
+          (starts-with? raw "Initial commit on "))
         (hash 'branch (substring raw 18 (string-length raw))
           'status
           "No commits yet"
@@ -142,20 +234,24 @@
                [dots-parts (split-many branch-part "...")]
                [branch (list-ref dots-parts 0)]
                [upstream (if (> (length dots-parts) 1) (list-ref dots-parts 1) #false)]
+               [ahead (if info-part (number-after-token info-part "ahead") 0)]
+               [behind (if info-part (number-after-token info-part "behind") 0)]
                [status-desc
                  (cond
-                   [(not upstream) "local branch"]
-                   [(not info-part) (string-append "tracking " upstream " [up to date]")]
-                   [else (string-append "tracking " upstream " [" info-part)])])
+                   [(not upstream) "local"]
+                   [(and (= ahead 0) (= behind 0)) "up to date"]
+                   [(and (> ahead 0) (> behind 0)) "diverged"]
+                   [(> behind 0) "need pull"]
+                   [else "need push"])])
           (hash 'branch branch
             'status
             status-desc
             'upstream
             upstream
             'ahead
-            0
+            ahead
             'behind
-            0))])))
+            behind))])))
 
 ;; Parse `git status --porcelain=v1 -b -uall -z` output. NUL delimiting avoids
 ;; Git's C-style quoting, so paths with spaces or Unicode stay byte-exact.
@@ -237,30 +333,290 @@
         'unmerged
         '()))))
 
-;; Get recent commits (up to count)
-(define (git-recent-commits dir [count 5])
+;; Get all commits with Git's own graph prefix, author and decorations.
+;; Record/unit separators keep graph glyphs out of the commit fields.
+(define (parse-log-graph output sep fs)
+  (let ([chunks (split-many output sep)])
+    (if (null? chunks)
+      '()
+      (let loop ([remaining (cdr chunks)] [carry (car chunks)] [acc '()])
+        (if (null? remaining)
+          (reverse acc)
+          (let* ([lines (split-many (car remaining) "\n")]
+                 [fields (if (pair? lines) (car lines) "")]
+                 [rest-lines (if (pair? lines) (cdr lines) '())]
+                 [parts (split-many fields fs)])
+            (loop (cdr remaining)
+              (string-join rest-lines "\n")
+              (if (>= (length parts) 4)
+                (cons (hash 'graph carry
+                       'hash
+                       (trim (list-ref parts 0))
+                       'author
+                       (trim (list-ref parts 1))
+                       'subject
+                       (trim (list-ref parts 2))
+                       'decoration
+                       (trim (list-ref parts 3)))
+                  acc)
+                acc))))))))
+
+(define (git-recent-commits dir [count #false])
   (if (git-has-commits? dir)
-    (let ([res (git-exec dir (list "log" (string-append "-n" (number->string count)) "--oneline"))])
+    (let* ([sep (string (integer->char 30))]
+           [fs (string (integer->char 31))]
+           [fmt (string-append sep "%h" fs "%an" fs "%s" fs "%d")]
+           [args (append
+                  (list "log" "--graph" "--date-order" "--all" "--decorate")
+                  (if count
+                    (list (string-append "-n" (number->string count)))
+                    '())
+                  (list (string-append "--format=" fmt)))]
+           [res (git-exec dir args)])
       (if (hash-ref res 'ok)
-        (let ([lines (filter (lambda (l) (> (string-length l) 0))
-                      (split-many (hash-ref res 'stdout) "\n"))])
-          (map (lambda (line)
-                (let* ([trimmed (trim line)]
-                       [parts (split-whitespace trimmed)]
-                       [c-hash (if (pair? parts) (car parts) "")]
-                       [subj (if (pair? parts)
-                              (trim (substring trimmed (string-length c-hash) (string-length trimmed)))
-                              "")])
-                  (cons c-hash subj)))
-            lines))
+        (parse-log-graph (hash-ref res 'stdout) sep fs)
         '()))
     '()))
 
+(define (replace-once text old new)
+  (let ([old-len (string-length old)]
+        [len (string-length text)])
+    (let loop ([i 0])
+      (if (> (+ i old-len) len)
+        text
+        (if (string=? (substring text i (+ i old-len)) old)
+          (string-append (substring text 0 i)
+            new
+            (substring text (+ i old-len) len))
+          (loop (+ i 1)))))))
+
+(define (string-contains? text needle)
+  (let ([needle-len (string-length needle)]
+        [len (string-length text)])
+    (and (> needle-len 0)
+      (let loop ([i 0])
+        (cond
+          [(> (+ i needle-len) len) #false]
+          [(string=? (substring text i (+ i needle-len)) needle) #true]
+          [else (loop (+ i 1))])))))
+
+(define (commit-graph-lines commit)
+  (let ([graph (hash-ref commit 'graph)])
+    (if (string=? graph "")
+      '()
+      (split-many graph "\n"))))
+
+;; Pull the first useful branch name out of a `git log --decorate` string.
+(define (ref-part-name part)
+  (let ([p (trim part)])
+    (cond
+      [(starts-with? p "HEAD -> ")
+        (trim (substring p 8 (string-length p)))]
+      [(or (string=? p "") (starts-with? p "tag: ")) #false]
+      [(starts-with? p "origin/")
+        (substring p 7 (string-length p))]
+      [else p])))
+
+(define (branch-from-decoration decoration)
+  (let* ([len (string-length decoration)]
+         [inner (if (and (> len 1) (char=? (string-ref decoration 0) #\())
+                 (substring decoration 1 (- len 1))
+                 decoration)]
+         [parts (split-many inner ",")])
+    (let loop ([remaining parts] [fallback ""])
+      (if (null? remaining)
+        fallback
+        (let* ([part (trim (car remaining))]
+               [name (ref-part-name part)])
+          (if (and name (starts-with? part "HEAD -> "))
+            name
+            (loop (cdr remaining)
+              (if (and name (string=? fallback "")) name fallback))))))))
+
+(define (decoration-display decoration)
+  (if (string=? decoration "")
+    ""
+    (let ([name (branch-from-decoration decoration)])
+      (if (string=? name "")
+        (string-append " " decoration)
+        (string-append "  ← " name)))))
+
+;; Render every commit as an `o` node, with explicit `|`, `|\` and `| |`
+;; rails. Commit metadata stays aligned on the node row.
+(define (commits-display-lines commits)
+  (define (prepend-rails rails acc)
+    (if (null? rails)
+      acc
+      (prepend-rails (cdr rails) (cons (trim (car rails)) acc))))
+  (let loop ([remaining commits] [acc '()])
+    (if (null? remaining)
+      (reverse acc)
+      (let* ([commit (car remaining)]
+             [lines (commit-graph-lines commit)]
+             [prior (all-but-last lines)]
+             [node-raw (if (null? lines) "o" (car (reverse lines)))]
+             [node-line (replace-once (trim node-raw) "*" "o")]
+             [decoration (hash-ref commit 'decoration)]
+             [node-text (string-append
+                         node-line
+                         " "
+                         (hash-ref commit 'hash)
+                         " "
+                         (hash-ref commit 'author)
+                         (string (integer->char 8203))
+                         " "
+                         (hash-ref commit 'subject)
+                         (if (string=? decoration "")
+                           ""
+                           (decoration-display decoration)))]
+             [with-rails (prepend-rails prior acc)])
+        (loop (cdr remaining) (cons node-text with-rails))))))
+
+(define (commit-display-lines commit)
+  (commits-display-lines (list commit)))
+
+;; Branches with ahead/behind counts, upstream and last commit metadata.
+(define (git-branch-list dir)
+  (let* ([fs (string (integer->char 31))]
+         [fmt (string-append "%(refname:short)" fs "%(HEAD)" fs
+               "%(upstream:short)"
+               fs
+               "%(objectname:short)"
+               fs
+               "%(subject)")]
+         [res (git-exec dir
+               (list "for-each-ref" (string-append "--format=" fmt) "refs/heads"))])
+    (if (not (hash-ref res 'ok))
+      '()
+      (let loop ([lines (filter (lambda (l) (> (string-length l) 0))
+                         (split-many (hash-ref res 'stdout) "\n"))]
+                 [acc '()])
+        (if (null? lines)
+          (reverse acc)
+          (let ([parts (split-many (car lines) fs)])
+            (if (< (length parts) 5)
+              (loop (cdr lines) acc)
+              (let* ([name (list-ref parts 0)]
+                     [current? (string=? (trim (list-ref parts 1)) "*")]
+                     [upstream-raw (trim (list-ref parts 2))]
+                     [upstream (if (string=? upstream-raw "") #false upstream-raw)]
+                     [counts
+                       (if upstream
+                         (let ([cr (git-exec dir
+                                    (list "rev-list" "--left-right" "--count"
+                                      (string-append name "..." upstream)))])
+                           (if (hash-ref cr 'ok)
+                             (let* ([nums (split-whitespace
+                                           (trim (hash-ref cr 'stdout)))]
+                                    [ahead (if (pair? nums)
+                                            (xit-string->number (car nums))
+                                            0)]
+                                    [behind (if (> (length nums) 1)
+                                             (xit-string->number (list-ref nums 1))
+                                             0)])
+                               (cons ahead behind))
+                             (cons 0 0)))
+                         (cons 0 0))]
+                     [ahead (car counts)]
+                     [behind (cdr counts)]
+                     [status
+                       (cond
+                         [(not upstream) "local"]
+                         [(and (= ahead 0) (= behind 0)) "up to date"]
+                         [(and (> ahead 0) (> behind 0)) "diverged"]
+                         [(> behind 0) "need pull"]
+                         [else "need push"])]
+                     [branch
+                       (hash 'name name
+                         'current
+                         current?
+                         'upstream
+                         upstream
+                         'ahead
+                         ahead
+                         'behind
+                         behind
+                         'status
+                         status
+                         'hash
+                         (trim (list-ref parts 3))
+                         'subject
+                         (trim (list-ref parts 4)))])
+                (loop (cdr lines) (cons branch acc))))))))))
+
+(define (git-branch-create! dir name [start #false])
+  (if (string=? (trim name) "")
+    (hash 'success #false 'message "Branch name cannot be empty")
+    (let ([res (if start
+                (git-exec dir (list "switch" "-c" name start))
+                (git-exec dir (list "switch" "-c" name)))])
+      (if (hash-ref res 'ok)
+        (hash 'success #true
+          'message
+          (string-append "Created and switched to branch: " name))
+        (hash 'success #false 'message (hash-ref res 'stderr))))))
+
+(define (git-branch-checkout! dir name)
+  (let ([branch (hash-ref (git-head-info dir) 'branch)])
+    (if (string=? branch name)
+      (hash 'success #true 'message (string-append "Already on branch: " name))
+      (let ([res (git-exec dir (list "switch" "--" name))])
+        (if (hash-ref res 'ok)
+          (hash 'success #true
+            'message
+            (string-append "Switched to branch: " name))
+          (hash 'success #false 'message (hash-ref res 'stderr)))))))
+
+(define (git-branch-delete! dir name)
+  (let ([branch (hash-ref (git-head-info dir) 'branch)])
+    (if (string=? branch name)
+      (hash 'success #false 'message "Cannot delete the current branch")
+      (let ([res (git-exec dir (list "branch" "-d" "--" name))])
+        (if (hash-ref res 'ok)
+          (hash 'success #true 'message (string-append "Deleted branch: " name))
+          (hash 'success #false 'message (hash-ref res 'stderr)))))))
+
+(define (git-branch-merge! dir name)
+  (let ([res (git-exec dir (list "merge" "--no-edit" name))]
+        [conflicts? (not (null? (hash-ref (git-status-entries dir) 'unmerged)))])
+    (cond
+      [conflicts?
+        (hash 'success #true 'conflicts #true
+          'message
+          (string-append "Merge conflicts while merging " name))]
+      [(hash-ref res 'ok)
+        (hash 'success #true 'conflicts #false
+          'message
+          (string-append "Merged branch: " name))]
+      [else
+        (hash 'success #false 'conflicts #false
+          'message
+          (hash-ref res 'stderr))])))
+
+(define (git-branch-diff dir current selected)
+  (let ([res (git-exec dir (list "diff" (string-append current "..." selected)))])
+    (hash-ref res 'stdout)))
+
+; Render the Head line consistently in every xit buffer.
+(define (head-display head-info)
+  (let ([branch (hash-ref head-info 'branch)]
+        [upstream (hash-ref head-info 'upstream)]
+        [ahead (hash-ref head-info 'ahead)]
+        [behind (hash-ref head-info 'behind)]
+        [status (hash-ref head-info 'status)])
+    (if upstream
+      (string-append branch " → " upstream
+        " ↑"
+        (number->string ahead)
+        " ↓"
+        (number->string behind)
+        " "
+        status)
+      (string-append branch " (" status ")"))))
+
 ;; Format the full interactive git status buffer
 (define (format-status-buffer repo-dir head-info entries recent-commits show-help? [expanded-paths '()])
-  (let* ([branch-str (hash-ref head-info 'branch)]
-         [status-str (hash-ref head-info 'status)]
-         [unmerged (hash-ref entries 'unmerged)]
+  (let* ([unmerged (hash-ref entries 'unmerged)]
          [unstaged (hash-ref entries 'unstaged)]
          [staged (hash-ref entries 'staged)]
          [untracked (hash-ref entries 'untracked)]
@@ -285,7 +641,7 @@
               (split-many diff "\n"))))))
 
     ;; Header
-    (emit! (string-append "Head:    " branch-str " (" status-str ")"))
+    (emit! (string-append "Head:    " (head-display head-info)))
     (emit! (string-append "Repo:    " repo-dir))
     (emit! "")
 
@@ -295,11 +651,11 @@
         (emit! "Help (press '?' to hide):")
         (emit! "  s        Stage file/section, or every file in selection")
         (emit! "  u        Unstage file/section, or every file in selection")
-        (emit! "  v/V/C-j  Select line(s), then s to stage, u to unstage, D to diff")
-        (emit! "  d        Discard unstaged changes / delete untracked file (confirm y)")
+        (emit! "  v/V/C-j  Select line(s), then s to stage, u to unstage, D to discard")
+        (emit! "  D        Discard file/section/selection (confirm y)")
         (emit! "  ret/tab  Fold/unfold file diff (or show commit diff)")
         (emit! "  o        Open file in editor")
-        (emit! "  D        Show diff in buffer (all selected files when a selection is active)")
+        (emit! "  :git-diff Show diff buffer (all selected files when a selection is active)")
         (emit! "  O        Resolve conflict using OURS version")
         (emit! "  T        Resolve conflict using THEIRS version")
         (emit! "  c        Open commit editor; :w writes and commits")
@@ -308,12 +664,13 @@
         (emit! "  U        Unstage all changes")
         (emit! "  P        Git push")
         (emit! "  p        Git pull")
+        (emit! "  b        Open branch manager")
         (emit! "  r        Refresh status")
         (emit! "  :git-save Apply edited buffer to git")
         (emit! "  q        Close git buffer")
         (emit! ""))
       (begin
-        (emit! "Keys:    [s] stage  [u] unstage  [d] discard (confirm)  [ret] fold diff  [D] diff  [v] select  [?] help")
+        (emit! "Keys:    [s] stage  [u] unstage  [D] discard (confirm y)  [b] branches  [ret] fold diff  [?] help")
         (emit! "")))
 
     ;; Unmerged (Conflicts)
@@ -353,16 +710,96 @@
       (emit! "Working tree clean. Nothing to commit.")
       (emit! ""))
 
-    ;; Recent commits
+    ;; Full commit graph
     (when (not (null? recent-commits))
-      (emit! (string-append "Recent Commits (" (number->string (length recent-commits)) ")"))
-      (for-each
-        (lambda (c)
-          (emit! (string-append "  " (car c) "  " (cdr c))))
-        recent-commits)
+      (emit! (string-append "Commit Graph (" (number->string (length recent-commits)) ")"))
+      (for-each emit!
+        (commits-display-lines recent-commits))
       (emit! ""))
 
     (string-join (reverse out-lines) "\n")))
+
+;; Render the branch manager buffer with aligned columns.
+(define (format-branch-buffer repo-dir head-info branches show-help?)
+  (let* ([names (map (lambda (b) (hash-ref b 'name)) branches)]
+         [upstreams (map (lambda (b) (or (hash-ref b 'upstream) "—")) branches)]
+         [arrows (map (lambda (b)
+                       (string-append "↑"
+                         (number->string (hash-ref b 'ahead))
+                         " ↓"
+                         (number->string (hash-ref b 'behind))))
+                  branches)]
+         [statuses (map (lambda (b) (hash-ref b 'status)) branches)]
+         [hashes (map (lambda (b) (hash-ref b 'hash)) branches)]
+         [name-width (max-string-length names)]
+         [upstream-width (max-string-length upstreams)]
+         [arrow-width (max-string-length arrows)]
+         [status-width (max-string-length statuses)]
+         [hash-width (max-string-length hashes)]
+         [out-lines '()])
+    (define (emit! line)
+      (set! out-lines (cons line out-lines)))
+
+    (emit! (string-append "Head:    " (head-display head-info)))
+    (emit! (string-append "Repo:    " repo-dir))
+    (emit! "")
+    (if show-help?
+      (begin
+        (emit! "Keys:    [ret] checkout  [tab] diff  [n] new  [N] new from selected")
+        (emit! "Keys:    [D] delete (confirm y)  [m] merge  [g] graph")
+        (emit! "Keys:    [p] pull  [P] push  [r] refresh  [q] close  [?] hide help"))
+      (emit! "Keys:    [ret] checkout  [tab] diff  [n] new  [N] from  [D] delete  [m] merge  [g] graph  [?] help"))
+    (emit! "")
+    (emit! (string-append "Branches (" (number->string (length branches)) ")"))
+    (let loop ([remaining branches]
+               [remaining-names names]
+               [remaining-upstreams upstreams]
+               [remaining-arrows arrows]
+               [remaining-statuses statuses]
+               [remaining-hashes hashes])
+      (unless (null? remaining)
+        (emit!
+          (string-append
+            (if (hash-ref (car remaining) 'current) "* " "  ")
+            (pad-right (car remaining-names) name-width)
+            "  "
+            (pad-right (car remaining-upstreams) upstream-width)
+            "  "
+            (pad-right (car remaining-arrows) arrow-width)
+            "  "
+            (pad-right (car remaining-statuses) status-width)
+            "  "
+            (pad-right (car remaining-hashes) hash-width)
+            " "
+            (hash-ref (car remaining) 'subject)))
+        (loop (cdr remaining)
+          (cdr remaining-names)
+          (cdr remaining-upstreams)
+          (cdr remaining-arrows)
+          (cdr remaining-statuses)
+          (cdr remaining-hashes))))
+    (string-join (reverse out-lines) "\n")))
+
+;; Render the full branch graph buffer.
+(define (format-graph-buffer head-info commits)
+  (let ([out-lines '()])
+    (define (emit! line)
+      (set! out-lines (cons line out-lines)))
+    (emit! (string-append "Head:    " (head-display head-info)))
+    (emit! "Keys:    [r] refresh  [q] close")
+    (emit! "")
+    (emit! "Branch Graph")
+    (for-each emit!
+      (commits-display-lines commits))
+    (string-join (reverse out-lines) "\n")))
+
+;; Branch name from a rendered branch line. Git branch names contain no spaces.
+(define (parse-branch-line line)
+  (if (or (starts-with? line "* ") (starts-with? line "  "))
+    (let ([parts (split-whitespace
+                  (substring line 2 (string-length line)))])
+      (if (pair? parts) (car parts) #false))
+    #false))
 
 ;; Entry lines are always "<marker><status>  <path>", where <marker> is "> ",
 ;; "v " or two spaces. Slice by fixed offsets instead of split-whitespace so
@@ -407,7 +844,8 @@
           (hash 'type 'section-header 'section 'staged)]
         [(starts-with? line "Untracked (")
           (hash 'type 'section-header 'section 'untracked)]
-        [(starts-with? line "Recent Commits (")
+        [(or (starts-with? line "Recent Commits (")
+            (starts-with? line "Commit Graph ("))
           (hash 'type 'section-header 'section 'recent-commits)]
         [(or (starts-with? line "> ") (starts-with? line "v "))
           (let loop ([idx (- line-n 1)])
@@ -428,14 +866,17 @@
                       (not (string-contains? prev-line "(")))
                     (hash 'type 'none)]
                   [else (loop (- idx 1))]))))]
-        [(starts-with? line "  ")
-          (let* ([trimmed (trim line)]
-                 [parts (split-whitespace trimmed)]
-                 [c-hash (car parts)]
-                 [subj (trim (substring trimmed
-                              (string-length c-hash)
-                              (string-length trimmed)))])
-            (hash 'type 'commit 'hash c-hash 'subject subj))]
+        [(or (starts-with? line "  ")
+            (starts-with? line "o")
+            (starts-with? line "|"))
+          (let ([c-hash (commit-hash-from-line line)])
+            (if c-hash
+              (hash 'type 'commit
+                'hash
+                c-hash
+                'subject
+                (commit-subject-from-line line))
+              (hash 'type 'none)))]
         [else (hash 'type 'none)]))))
 
 ;; Stage the target at cursor
@@ -766,9 +1207,13 @@
           [(starts-with? line "Unstaged (") (set! cur-sec 'unstaged)]
           [(starts-with? line "Untracked (") (set! cur-sec 'untracked)]
           [(starts-with? line "Unmerged (") (set! cur-sec 'unmerged)]
-          [(starts-with? line "Recent Commits (") (set! cur-sec 'recent-commits)]
+          [(or (starts-with? line "Recent Commits (")
+              (starts-with? line "Commit Graph ("))
+            (set! cur-sec 'recent-commits)]
           [(and (> (string-length line) 0)
               (not (starts-with? line "  "))
+              (not (starts-with? line "o"))
+              (not (starts-with? line "|"))
               (not (starts-with? line "> "))
               (not (starts-with? line "v "))
               (not (starts-with? line "Keys:"))

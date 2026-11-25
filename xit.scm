@@ -39,24 +39,43 @@
   git-close
   git-help
   git-diff-selection
+  git-branches
+  git-branches-refresh
+  git-branches-checkout
+  git-branches-new
+  git-branches-new-from
+  git-branches-delete
+  git-branches-merge
+  git-branches-diff
+  git-branches-help
+  git-branches-close
+  git-branch-graph
+  git-graph-refresh
+  git-graph-close
   git-save
   xit-info
   xit-error
   XIT-BUFFER-NAME
   XIT-COMMIT-BUFFER-NAME
   XIT-DIFF-BUFFER-NAME
+  XIT-BRANCH-BUFFER-NAME
+  XIT-GRAPH-BUFFER-NAME
   GIT-BUFFER-NAME
   GIT-COMMIT-BUFFER-NAME
   GIT-DIFF-BUFFER-NAME
   XIT-KEYMAPS
   XIT-COMMIT-KEYMAPS
   XIT-DIFF-KEYMAPS
+  XIT-BRANCH-KEYMAPS
+  XIT-GRAPH-KEYMAPS
   xit-install-buffer-keymap!)
 
 ;; Buffer names
 (define XIT-BUFFER-NAME "*git*")
 (define XIT-COMMIT-BUFFER-NAME "*git-commit*")
 (define XIT-DIFF-BUFFER-NAME "*git-diff*")
+(define XIT-BRANCH-BUFFER-NAME "*git-branches*")
+(define XIT-GRAPH-BUFFER-NAME "*git-graph*")
 
 ;; Git's standard scissors line. Everything below it in the commit editor is a
 ;; display-only staged diff preview; Helix's git-commit grammar injects the diff
@@ -67,6 +86,8 @@
 (define GIT-BUFFER-NAME XIT-BUFFER-NAME)
 (define GIT-COMMIT-BUFFER-NAME XIT-COMMIT-BUFFER-NAME)
 (define GIT-DIFF-BUFFER-NAME XIT-DIFF-BUFFER-NAME)
+(define GIT-BRANCH-BUFFER-NAME XIT-BRANCH-BUFFER-NAME)
+(define GIT-GRAPH-BUFFER-NAME XIT-GRAPH-BUFFER-NAME)
 
 ;; Install a buffer-local keymap that inherits the current global keys. Called
 ;; when a xit buffer is created so the required keymaps work without any setup
@@ -81,8 +102,11 @@
 (define *xit-doc-id* #false)
 (define *xit-commit-doc-id* #false)
 (define *xit-diff-doc-id* #false)
+(define *xit-branch-doc-id* #false)
+(define *xit-graph-doc-id* #false)
 (define *xit-original-sections* #false)
 (define *xit-show-help* #false)
+(define *xit-branch-show-help* #false)
 (define *xit-commit-amend?* #false)
 (define *xit-commit-path* #false)
 (define *xit-commit-finishing?* #false)
@@ -114,6 +138,13 @@
     ;; Return void so Helix does not print the result in the status line.
     void))
 
+;; Reload every open file from disk after operations that change files outside
+;; Helix (commit, abort/close, pull). Scratch buffers are ignored by Helix.
+(define (xit-reload-all!)
+  (with-handler (lambda (_) void)
+    (helix.reload-all))
+  void)
+
 ;; =============================================================================
 ;; Helix Editor Buffer Lifecycle
 ;; =============================================================================
@@ -127,12 +158,28 @@
 (define (diff-buffer-alive?)
   (and *xit-diff-doc-id* (editor-doc-exists? *xit-diff-doc-id*)))
 
+(define (branch-buffer-alive?)
+  (and *xit-branch-doc-id* (editor-doc-exists? *xit-branch-doc-id*)))
+
+(define (graph-buffer-alive?)
+  (and *xit-graph-doc-id* (editor-doc-exists? *xit-graph-doc-id*)))
+
+(define (xit-focus-doc! doc-id)
+  (when (and doc-id (editor-doc-exists? doc-id))
+    (editor-switch-action! doc-id (Action/Replace)))
+  void)
+
+(define (xit-line-at lines n)
+  (if (and (>= n 0) (< n (length lines)))
+    (list-ref lines n)
+    ""))
+
 ;; Refresh the status buffer content
 (define (refresh-git-buffer! [target-line #false])
   (when (and *xit-dir* (git-buffer-alive?))
     (let* ([head-info (git-head-info *xit-dir*)]
            [entries (git-status-entries *xit-dir*)]
-           [commits (git-recent-commits *xit-dir* 5)]
+           [commits (git-recent-commits *xit-dir*)]
            [text-buf (format-status-buffer *xit-dir* head-info entries commits
                       *xit-show-help*
                       *xit-expanded-paths*)]
@@ -152,6 +199,53 @@
       (replace-selection-with text-buf)
       (collapse_selection)
       (helix.goto-line (+ safe-line 1)))))
+
+; Refresh the branch manager buffer.
+(define (refresh-branch-buffer! [target-line #false])
+  (when (and *xit-dir* (branch-buffer-alive?))
+    (let* ([head-info (git-head-info *xit-dir*)]
+           [branches (git-branch-list *xit-dir*)]
+           [text-buf (format-branch-buffer *xit-dir* head-info branches
+                      *xit-branch-show-help*)]
+           [lines (split-many text-buf "\n")]
+           [cur-line (or target-line (get-current-line-number))]
+           [safe-line (max 0 (min cur-line (- (length lines) 1)))])
+      (select_all)
+      (replace-selection-with text-buf)
+      (collapse_selection)
+      (helix.goto-line (+ safe-line 1)))))
+
+;; Refresh the full commit graph buffer.
+(define (refresh-graph-buffer! [target-line #false])
+  (when (and *xit-dir* (graph-buffer-alive?))
+    (let* ([head-info (git-head-info *xit-dir*)]
+           [commits (git-recent-commits *xit-dir*)]
+           [text-buf (format-graph-buffer head-info commits)]
+           [lines (split-many text-buf "\n")]
+           [cur-line (or target-line (get-current-line-number))]
+           [safe-line (max 0 (min cur-line (- (length lines) 1)))])
+      (select_all)
+      (replace-selection-with text-buf)
+      (collapse_selection)
+      (helix.goto-line (+ safe-line 1)))))
+
+;; Refresh every xit buffer that is currently open, restoring the original
+;; focus afterwards so background operations do not yank the user away.
+(define (xit-refresh-open-buffers!)
+  (let ([original (with-handler (lambda (_) #false)
+                   (editor->doc-id (editor-focus)))])
+    (when (git-buffer-alive?)
+      (xit-focus-doc! *xit-doc-id*)
+      (refresh-git-buffer!))
+    (when (branch-buffer-alive?)
+      (xit-focus-doc! *xit-branch-doc-id*)
+      (refresh-branch-buffer!))
+    (when (graph-buffer-alive?)
+      (xit-focus-doc! *xit-graph-doc-id*)
+      (refresh-graph-buffer!))
+    (when (and original (editor-doc-exists? original))
+      (xit-focus-doc! original)))
+  void)
 
 ;; Open or focus the git status buffer
 (define (open-git-for-dir dir)
@@ -178,6 +272,70 @@
                   (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-BUFFER-NAME)
                   (refresh-git-buffer! 4)
                   (xit-set-buffer-language! "xit" "git-commit"))))))))))
+
+; Open or focus the branch manager buffer.
+(define (open-branch-buffer-for-dir dir)
+  (let* ([canonical (with-handler (lambda (_) dir) (canonicalize-path dir))]
+         [repo-root (git-repo-root canonical)])
+    (if (not repo-root)
+      (xit-error (string-append "Not a git repository: " canonical))
+      (begin
+        (set! *xit-dir* repo-root)
+        (if (branch-buffer-alive?)
+          (begin
+            (xit-focus-doc! *xit-branch-doc-id*)
+            (refresh-branch-buffer!))
+          (begin
+            (helix.new)
+            (enqueue-thread-local-callback
+              (lambda ()
+                (let* ([view-id (editor-focus)]
+                       [doc-id (editor->doc-id view-id)])
+                  (set! *xit-branch-doc-id* doc-id)
+                  (set-scratch-buffer-name! XIT-BRANCH-BUFFER-NAME)
+                  (xit-install-buffer-keymap! XIT-BRANCH-BUFFER-NAME XIT-BRANCH-KEYMAPS)
+                  (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-BRANCH-BUFFER-NAME)
+                  (refresh-branch-buffer! 7)
+                  (xit-set-buffer-language! "xit" "git-commit"))))))))))
+
+;; Open or focus the full branch graph buffer.
+(define (open-graph-buffer-for-dir dir)
+  (let* ([canonical (with-handler (lambda (_) dir) (canonicalize-path dir))]
+         [repo-root (git-repo-root canonical)])
+    (if (not repo-root)
+      (xit-error (string-append "Not a git repository: " canonical))
+      (begin
+        (set! *xit-dir* repo-root)
+        (if (graph-buffer-alive?)
+          (begin
+            (xit-focus-doc! *xit-graph-doc-id*)
+            (refresh-graph-buffer!))
+          (begin
+            (helix.new)
+            (enqueue-thread-local-callback
+              (lambda ()
+                (let* ([view-id (editor-focus)]
+                       [doc-id (editor->doc-id view-id)])
+                  (set! *xit-graph-doc-id* doc-id)
+                  (set-scratch-buffer-name! XIT-GRAPH-BUFFER-NAME)
+                  (xit-install-buffer-keymap! XIT-GRAPH-BUFFER-NAME XIT-GRAPH-KEYMAPS)
+                  (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-GRAPH-BUFFER-NAME)
+                  (refresh-graph-buffer! 4)
+                  (xit-set-buffer-language! "xit" "git-commit"))))))))))
+
+;; Branch name on the current line of *git-branches*.
+(define (current-branch-buffer-name)
+  (let ([fallback (if *xit-dir*
+                   (hash-ref (git-head-info *xit-dir*) 'branch)
+                   "HEAD")])
+    (if (branch-buffer-alive?)
+      (let* ([rope (editor->text *xit-branch-doc-id*)]
+             [text (text.rope->string rope)]
+             [lines (split-many text "\n")]
+             [line (xit-line-at lines (get-current-line-number))]
+             [name (parse-branch-line line)])
+        (or name fallback))
+      fallback)))
 
 ;; Get the target under the current cursor in *git* buffer
 (define (current-buffer-target)
@@ -254,6 +412,9 @@
         [(string=? subcmd "commit") (git-commit)]
         [(string=? subcmd "diff") (git-diff)]
         [(string=? subcmd "diff-selection") (git-diff-selection)]
+        [(string=? subcmd "branches") (git-branches)]
+        [(string=? subcmd "branch") (git-branches)]
+        [(string=? subcmd "graph") (git-branch-graph)]
         [(string=? subcmd "push") (git-push)]
         [(string=? subcmd "pull") (git-pull)]
         [(string=? subcmd "status") (Git)]
@@ -380,27 +541,57 @@
     (xit-error "Not in a git repository")))
 
 ;;@doc
-;; Ask for confirmation before discarding changes under cursor
+;; Ask for confirmation before discarding the file/section under cursor, or
+;; every selected file when a Helix selection spans multiple lines.
 (define (git-discard)
   (unless (git-buffer-alive?)
     (xit-error "No active git buffer"))
   (when (git-buffer-alive?)
-    (let* ([target (current-buffer-target)]
-           [label (if (eq? (hash-ref target 'type) 'entry)
-                   (string-append "Discard " (hash-ref target 'path) "? type y to confirm: ")
-                   "Discard this section? type y to confirm: ")])
-      (push-component!
-        (prompt label
-          (lambda (answer)
-            (when (or (string=? answer "y") (string=? answer "Y")
-                   (string=? answer "yes")
-                   (string=? answer "YES"))
-              (let ([res (git-discard-target! *xit-dir* target)])
-                (if (hash-ref res 'success)
-                  (begin
-                    (xit-info (hash-ref res 'message))
-                    (refresh-git-buffer!))
-                  (xit-error (hash-ref res 'message))))))))))
+    (let* ([line-numbers (current-selection-line-numbers)]
+           [multi? (> (length line-numbers) 1)]
+           [targets (if multi?
+                     (targets-for-lines line-numbers)
+                     (list (current-buffer-target)))]
+           [entries (filter (lambda (target)
+                             (eq? (hash-ref target 'type) 'entry))
+                     targets)]
+           [label (cond
+                   [multi?
+                     (string-append "Discard "
+                       (number->string (length entries))
+                       " selected file(s)? type y to confirm: ")]
+                   [(pair? entries)
+                     (string-append "Discard " (hash-ref (car entries) 'path)
+                       "? type y to confirm: ")]
+                   [else
+                     "Discard this section? type y to confirm: "])]
+           [confirmed? (lambda (answer)
+                        (or (string=? answer "y") (string=? answer "Y")
+                          (string=? answer "yes")
+                          (string=? answer "YES")))])
+      (if (and multi? (null? entries))
+        (xit-error "Nothing to discard in selection")
+        (push-component!
+          (prompt label
+            (lambda (answer)
+              (when (confirmed? answer)
+                (let* ([chosen (if multi? entries targets)]
+                       [results (map (lambda (target)
+                                      (git-discard-target! *xit-dir* target))
+                                 chosen)]
+                       [failed (filter (lambda (res)
+                                        (not (hash-ref res 'success)))
+                                results)])
+                  (if (null? failed)
+                    (begin
+                      (xit-info
+                        (if multi?
+                          (string-append "Discarded "
+                            (number->string (length results))
+                            " file(s)")
+                          (hash-ref (car results) 'message)))
+                      (refresh-git-buffer!))
+                    (xit-error (hash-ref (car failed) 'message)))))))))))
   void)
 
 ;;@doc
@@ -531,6 +722,185 @@
         (if (string=? (trim diff-text) "")
           (xit-info "No diff to display")
           (xit-show-diff! diff-text))))))
+
+;@doc
+;; Open or focus the branch manager buffer
+(define (git-branches)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (if *xit-dir*
+    (open-branch-buffer-for-dir *xit-dir*)
+    (xit-error "Not in a git repository")))
+
+;;@doc
+;; Refresh the branch manager buffer
+(define (git-branches-refresh)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (if (branch-buffer-alive?)
+    (begin
+      (refresh-branch-buffer!)
+      (xit-info "Branches refreshed"))
+    (xit-error "No active branch buffer")))
+
+;;@doc
+;; Check out the branch under the cursor
+(define (git-branches-checkout)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (when *xit-dir*
+    (let* ([name (current-branch-buffer-name)]
+           [res (git-branch-checkout! *xit-dir* name)])
+      (if (hash-ref res 'success)
+        (begin
+          (xit-info (hash-ref res 'message))
+          (xit-refresh-open-buffers!)
+          (xit-reload-all!))
+        (xit-error (hash-ref res 'message)))))
+  void)
+
+;;@doc
+;; Create a new branch from HEAD and switch to it
+(define (git-branches-new)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (when *xit-dir*
+    (push-component!
+      (prompt "New branch name: "
+        (lambda (name)
+          (let ([res (git-branch-create! *xit-dir* name)])
+            (if (hash-ref res 'success)
+              (begin
+                (xit-info (hash-ref res 'message))
+                (xit-refresh-open-buffers!)
+                (xit-reload-all!))
+              (xit-error (hash-ref res 'message))))))))
+  void)
+
+;;@doc
+;; Create a new branch from the selected branch and switch to it
+(define (git-branches-new-from)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (when *xit-dir*
+    (let ([start (current-branch-buffer-name)])
+      (push-component!
+        (prompt (string-append "New branch from " start ": ")
+          (lambda (name)
+            (let ([res (git-branch-create! *xit-dir* name start)])
+              (if (hash-ref res 'success)
+                (begin
+                  (xit-info (hash-ref res 'message))
+                  (xit-refresh-open-buffers!)
+                  (xit-reload-all!))
+                (xit-error (hash-ref res 'message)))))))))
+  void)
+
+;;@doc
+;; Safely delete the non-current branch under the cursor, after confirmation
+(define (git-branches-delete)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (when *xit-dir*
+    (let ([name (current-branch-buffer-name)])
+      (push-component!
+        (prompt (string-append "Delete branch " name "? type y to confirm: ")
+          (lambda (answer)
+            (when (or (string=? answer "y") (string=? answer "Y")
+                   (string=? answer "yes")
+                   (string=? answer "YES"))
+              (let ([res (git-branch-delete! *xit-dir* name)])
+                (if (hash-ref res 'success)
+                  (begin
+                    (xit-info (hash-ref res 'message))
+                    (xit-refresh-open-buffers!))
+                  (xit-error (hash-ref res 'message))))))))))
+  void)
+
+;;@doc
+;; Merge the branch under the cursor into the current branch
+(define (git-branches-merge)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (when *xit-dir*
+    (let* ([name (current-branch-buffer-name)]
+           [res (git-branch-merge! *xit-dir* name)])
+      (cond
+        [(not (hash-ref res 'success))
+          (xit-error (hash-ref res 'message))]
+        [(hash-ref res 'conflicts)
+          (xit-error (hash-ref res 'message))
+          (xit-refresh-open-buffers!)
+          (xit-reload-all!)]
+        [else
+          (xit-info (hash-ref res 'message))
+          (xit-refresh-open-buffers!)
+          (xit-reload-all!)])))
+  void)
+
+;;@doc
+;; Diff current branch against the branch under the cursor (current...selected)
+(define (git-branches-diff)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (when *xit-dir*
+    (let* ([current (hash-ref (git-head-info *xit-dir*) 'branch)]
+           [selected (current-branch-buffer-name)]
+           [diff-text (git-branch-diff *xit-dir* current selected)])
+      (if (string=? selected current)
+        (xit-info "Already on the selected branch")
+        (if (string=? (trim diff-text) "")
+          (xit-info "No differences between these branches")
+          (xit-show-diff! diff-text)))))
+  void)
+
+;;@doc
+;; Toggle branch manager help
+(define (git-branches-help)
+  (if (branch-buffer-alive?)
+    (begin
+      (set! *xit-branch-show-help* (not *xit-branch-show-help*))
+      (refresh-branch-buffer!))
+    (xit-error "No active branch buffer"))
+  void)
+
+;;@doc
+;; Close the branch manager buffer
+(define (git-branches-close)
+  (when (branch-buffer-alive?)
+    (xit-focus-doc! *xit-branch-doc-id*)
+    (helix.buffer-close!)
+    (set! *xit-branch-doc-id* #false))
+  (xit-reload-all!)
+  void)
+
+;;@doc
+;; Open or focus the full branch graph
+(define (git-branch-graph)
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (if *xit-dir*
+    (open-graph-buffer-for-dir *xit-dir*)
+    (xit-error "Not in a git repository")))
+
+;;@doc
+;; Refresh the branch graph buffer
+(define (git-graph-refresh)
+  (if (graph-buffer-alive?)
+    (begin
+      (refresh-graph-buffer!)
+      (xit-info "Graph refreshed"))
+    (xit-error "No active graph buffer"))
+  void)
+
+;;@doc
+;; Close the branch graph buffer
+(define (git-graph-close)
+  (when (graph-buffer-alive?)
+    (xit-focus-doc! *xit-graph-doc-id*)
+    (helix.buffer-close!)
+    (set! *xit-graph-doc-id* #false))
+  void)
 
 ;; Path used for the Git-like commit editor. --path-format keeps this absolute
 ;; and works for worktrees too.
@@ -680,17 +1050,17 @@
           (begin
             (helix.buffer-close!)
             (xit-info "Commit aborted: empty commit message")
-            (xit-reset-commit-state!))
+            (xit-reset-commit-state!)
+            (xit-reload-all!))
           (let ([res (git-commit! *xit-dir* final-msg *xit-commit-amend?*)])
             (if (hash-ref res 'success)
               (begin
                 (helix.buffer-close!)
                 (let ([first-line (if (pair? content-lines) (car content-lines) "commit")])
                   (xit-info (string-append "Committed: " first-line)))
-                (when (git-buffer-alive?)
-                  (editor-switch-action! *xit-doc-id* (Action/Replace))
-                  (refresh-git-buffer!))
-                (xit-reset-commit-state!))
+                (xit-refresh-open-buffers!)
+                (xit-reset-commit-state!)
+                (xit-reload-all!))
               (xit-error (string-append "Commit failed: " (hash-ref res 'message))))))))
     (set! *xit-commit-finishing?* #false))
   void)
@@ -702,6 +1072,7 @@
     (begin
       (helix.buffer-close!)
       (xit-reset-commit-state!)
+      (xit-reload-all!)
       (xit-info "Commit cancelled"))
     (xit-error "No active commit buffer"))
   void)
@@ -716,14 +1087,15 @@
       (if (hash-ref res 'success)
         (begin
           (xit-info (string-append "Committed: " msg))
-          (when (git-buffer-alive?) (refresh-git-buffer!)))
+          (when (git-buffer-alive?) (refresh-git-buffer!))
+          (xit-reload-all!))
         (xit-error (hash-ref res 'message))))
     (xit-error "Not in a git repository")))
 
 ;; Run a blocking remote operation off the editor thread. `git-remote-async!`
 ;; calls back from its worker thread, so every Helix action (notifications and
 ;; buffer refresh) is marshalled back with `hx.with-context`.
-(define (xit-remote! op-name start-msg done-msg args)
+(define (xit-remote! op-name start-msg done-msg args [reload-after? #false])
   (unless *xit-dir*
     (set! *xit-dir* (git-repo-root (get-helix-cwd))))
   (cond
@@ -744,7 +1116,8 @@
               (if (hash-ref res 'ok)
                 (begin
                   (xit-info done-msg)
-                  (when (git-buffer-alive?) (refresh-git-buffer!)))
+                  (xit-refresh-open-buffers!)
+                  (when reload-after? (xit-reload-all!)))
                 (let ([err (trim (hash-ref res 'stderr))]
                       [out (trim (hash-ref res 'stdout))])
                   (xit-error (if (string=? err "") out err))))))))
@@ -758,7 +1131,7 @@
 ;;@doc
 ;; Pull current branch from remote without blocking Helix.
 (define (git-pull)
-  (xit-remote! "Pull" "Pulling..." "Pull done" '("pull")))
+  (xit-remote! "Pull" "Pulling..." "Pull done" '("pull") #true))
 
 ;;@doc
 ;; Refresh the git status buffer
@@ -779,9 +1152,10 @@
     (xit-error "No active git buffer")))
 
 ;;@doc
-;; Close the active git buffer
+;; Close the active git buffer and reload files changed by git operations.
 (define (git-close)
-  (helix.buffer-close!))
+  (helix.buffer-close!)
+  (xit-reload-all!))
 
 ;;@doc
 ;; Save and apply buffer edits to git (oil-style buffer management)
@@ -839,7 +1213,7 @@
 ;; =============================================================================
 
 ;; The same bindings are installed for normal and select mode: Helix uses a
-;; separate keymap once `v` starts a selection, so `s`, `u`, `d` and `D` must be
+;; separate keymap once `v` starts a selection, so `s`, `u` and `D` must be
 ;; present in both for the selection workflow to work.
 (define XIT-BUFFER-KEYS
   (hash
@@ -847,10 +1221,8 @@
     ":git-stage"
     "u"
     ":git-unstage"
-    "d"
-    ":git-discard"
     "D"
-    ":git-diff"
+    ":git-discard"
     "ret"
     ":git-fold-toggle"
     "tab"
@@ -873,6 +1245,8 @@
     ":git-push"
     "p"
     ":git-pull"
+    "b"
+    ":git-branches"
     "r"
     ":git-refresh"
     "q"
@@ -882,6 +1256,42 @@
 
 (define XIT-KEYMAPS
   (hash "normal" XIT-BUFFER-KEYS "select" XIT-BUFFER-KEYS))
+
+(define XIT-BRANCH-BUFFER-KEYS
+  (hash
+    "ret"
+    ":git-branches-checkout"
+    "tab"
+    ":git-branches-diff"
+    "n"
+    ":git-branches-new"
+    "N"
+    ":git-branches-new-from"
+    "D"
+    ":git-branches-delete"
+    "m"
+    ":git-branches-merge"
+    "g"
+    ":git-branch-graph"
+    "p"
+    ":git-pull"
+    "P"
+    ":git-push"
+    "r"
+    ":git-branches-refresh"
+    "q"
+    ":git-branches-close"
+    "?"
+    ":git-branches-help"))
+
+(define XIT-BRANCH-KEYMAPS
+  (hash "normal" XIT-BRANCH-BUFFER-KEYS "select" XIT-BRANCH-BUFFER-KEYS))
+
+(define XIT-GRAPH-BUFFER-KEYS
+  (hash "r" ":git-graph-refresh" "q" ":git-graph-close"))
+
+(define XIT-GRAPH-KEYMAPS
+  (hash "normal" XIT-GRAPH-BUFFER-KEYS "select" XIT-GRAPH-BUFFER-KEYS))
 
 ;; Esc is deliberately left native here: repeated Esc presses collapse
 ;; selections and clear cursors, and must not abort the commit. Use q to abort.

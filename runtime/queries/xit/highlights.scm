@@ -1,4 +1,4 @@
-;; xit.hx status buffer highlights
+;; xit.hx status, branch and graph buffer highlights
 
 (head_line)
 @keyword
@@ -21,6 +21,12 @@
 (section_untracked_header)
 @string.special.path
 (section_recent_commits_header)
+@markup.heading
+(section_commit_graph_header)
+@markup.heading
+(section_branches_header)
+@markup.heading
+(section_graph_header)
 @markup.heading
 
 ;; Status letters
@@ -45,6 +51,10 @@
 (section_staged (entry (path) @diff.plus))
 (section_untracked (entry (path) @string.special.path))
 
+;; Branches.
+(branch_line)
+@variable
+
 ;; Inline folded diff bodies under a file entry: added lines green, removed
 ;; lines red, unchanged context lines left uncolored.
 (diff_add)
@@ -52,8 +62,12 @@
 (diff_del)
 @diff.minus
 
-;; Recent commits: hashes use a distinct capture from subjects (usually blue)
-;; so they stand out instead of sharing the yellow heading color.
+;; Commits: graph glyphs, hashes, authors and subjects each use a distinct
+;; capture. A zero-width marker keeps the visible separator at one space while
+;; letting tree-sitter color author and subject independently.
+(graph_prefix)
+@keyword
 (commit_hash)
 @function
-(section_recent_commits (commit (commit_subject) @markup.heading))
+(commit (commit_author) @type)
+(commit (commit_subject) @string)

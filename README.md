@@ -57,28 +57,74 @@ handled literally, so no manual quoting is needed.
 | Open commit editor | `c` |
 | Commit | type message above the scissors separator, then `:w` (the staged diff below it is display-only) |
 | Abort commit | `q` (Esc stays native and never aborts) |
-| Discard changes | `d`, then `y` to confirm |
-| View diff (all selected files when a selection is active) | `D` or `:git-diff` |
+| Discard changes / selection | `D`, then `y` to confirm |
+| View diff in `*git-diff*` | `:git-diff` (or `:Git diff`); selected files via `:git-diff-selection` |
 | Fold / unfold a file's diff inline | `ret` or `tab` |
 | Open file | `o` |
+| Open branch manager | `b` or `:Git branches` |
+| Open full branch graph | `g` in `*git-branches*` or `:Git graph` |
 | Refresh status | `r` |
 | Close xit buffer | `q` |
 | Show all keys | `?` |
 
 For selection staging, use normal Helix selection (`v`, `V`, `C-j`, multiple
-cursors) over file lines, then press `s` or `u`. The same selection works with
-`D` to show the combined diff of the selected files. A folded file shows `>`
-before its name; press `ret` or `tab` to unfold it into `v` and show its diff
-directly underneath.
+cursors) over file lines, then press `s`, `u`, or `D` to stage, unstage, or
+discard those files. To view a combined diff of a selection, use
+`:git-diff-selection`. A folded file shows `>` before its name; press `ret` or
+`tab` to unfold it into `v` and show its diff directly underneath. The `d` key
+is intentionally unbound; diffs stay accessible via commands and inline folds.
 
 More keys in `*git*`: `C` amend commit, `O` / `T` resolve conflicts, `S` / `U`
-stage or unstage all, `P` / `p` push or pull.
+stage or unstage all, `P` / `p` push or pull. Closing with `q`, committing (or
+aborting), and pulling reload all open Helix files from disk.
+
+The `Head:` line shows the current branch, upstream, ahead/behind counts and
+whether it needs a push or pull. The `Commit Graph` section shows every commit
+in the repository with single-space separators between graph, hash, author and
+subject. Every commit node is drawn as `o`, with explicit rails:
+
+```text
+o c05568a FITAHIANA Nomeniavo Joe Merge branch 'fix/selection-staging-diff'
+|\
+| o 615ec3b FITAHIANA Nomeniavo Joe feat: show staged diff
+o | 7159a13 FITAHIANA Nomeniavo joe fix: selection staging diff (#1)
+| o b33a0a4 FITAHIANA Nomeniavo Joe feat: collapse diff next files
+|/
+o 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
+```
+
+The merge subject names the branch that was merged in, and the `← branch`
+decoration on the node row identifies the branch it landed on. Tree-sitter
+gives graph glyphs, hashes, authors and commit messages separate highlight
+captures, so each uses a different color from the active Helix theme. An
+invisible marker separates author from message while keeping the visible gap
+at exactly one space.
+
+### Branch manager
+
+`*git-branches*` lists every local branch with its upstream, ahead/behind
+counts, status, last commit and subject.
+
+| Action | Key |
+|---|---|
+| Check out branch | `ret` |
+| Diff current branch against selected (`current...selected`) | `tab` |
+| Create and switch to new branch from HEAD | `n` |
+| Create new branch from selected branch and switch | `N` |
+| Safely delete selected branch | `D`, then `y` to confirm |
+| Merge selected branch into current branch | `m` |
+| Open full branch graph | `g` |
+| Pull / push | `p` / `P` |
+| Refresh / close / help | `r` / `q` / `?` |
+
+Deleting the current branch is refused. The full graph in `*git-graph*` can be
+refreshed with `r` and closed with `q`.
 
 ## Highlighting
 
 Applied automatically:
 
-- `*git*` → `xit` (hashes, subjects, sections, status entries)
+- `*git*`, `*git-branches*`, `*git-graph*` → `xit` (hashes, authors, graph glyphs, branches, sections, status entries)
 - `*git-commit*` → `git-commit`
 - `*git-diff*` → `diff`
 
