@@ -245,7 +245,7 @@
     '()))
 
 ;; Format the full interactive git status buffer
-(define (format-status-buffer repo-dir head-info entries recent-commits show-help?)
+(define (format-status-buffer repo-dir head-info entries recent-commits show-help? [expanded-paths '()])
   (let* ([branch-str (hash-ref head-info 'branch)]
          [status-str (hash-ref head-info 'status)]
          [unmerged (hash-ref entries 'unmerged)]
@@ -256,6 +256,21 @@
 
     (define (emit! line)
       (set! out-lines (cons line out-lines)))
+
+    ;; File entries are foldable: "> " is collapsed, "v " is expanded with the
+    ;; file's diff printed underneath, indented so it is never mistaken for an
+    ;; entry by the buffer parsers.
+    (define (emit-entry! status path section)
+      (let ([expanded? (member path expanded-paths)])
+        (emit! (string-append (if expanded? "v " "> ") status "  " path))
+        (when expanded?
+          (let ([diff (git-diff-target repo-dir
+                       (hash 'type 'entry 'section section 'path path))])
+            (for-each
+              (lambda (line)
+                (when (not (string=? line ""))
+                  (emit! (string-append "    " line))))
+              (split-many diff "\n"))))))
 
     ;; Header
     (emit! (string-append "Head:    " branch-str " (" status-str ")"))
@@ -285,15 +300,14 @@
         (emit! "  q        Close git buffer")
         (emit! ""))
       (begin
-        (emit! "Keys:    [s] stage  [u] unstage  [d] discard (confirm)  [c] commit  [D] diff  [v] select  [?] help")
+        (emit! "Keys:    [s] stage  [u] unstage  [d] discard (confirm)  [ret] fold diff  [D] diff  [v] select  [?] help")
         (emit! "")))
 
     ;; Unmerged (Conflicts)
     (when (not (null? unmerged))
       (emit! (string-append "Unmerged (" (number->string (length unmerged)) ")"))
       (for-each
-        (lambda (item)
-          (emit! (string-append "  " (car item) "  " (cdr item))))
+        (lambda (item) (emit-entry! (car item) (cdr item) 'unmerged))
         unmerged)
       (emit! ""))
 
@@ -301,8 +315,7 @@
     (when (not (null? unstaged))
       (emit! (string-append "Unstaged (" (number->string (length unstaged)) ")"))
       (for-each
-        (lambda (item)
-          (emit! (string-append "  " (car item) "  " (cdr item))))
+        (lambda (item) (emit-entry! (car item) (cdr item) 'unstaged))
         unstaged)
       (emit! ""))
 
@@ -310,8 +323,7 @@
     (when (not (null? staged))
       (emit! (string-append "Staged (" (number->string (length staged)) ")"))
       (for-each
-        (lambda (item)
-          (emit! (string-append "  " (car item) "  " (cdr item))))
+        (lambda (item) (emit-entry! (car item) (cdr item) 'staged))
         staged)
       (emit! ""))
 
@@ -319,8 +331,7 @@
     (when (not (null? untracked))
       (emit! (string-append "Untracked (" (number->string (length untracked)) ")"))
       (for-each
-        (lambda (item)
-          (emit! (string-append "  ?  " item)))
+        (lambda (item) (emit-entry! "?" item 'untracked))
         untracked)
       (emit! ""))
 
@@ -345,7 +356,28 @@
   (if (or (< line-n 0) (>= line-n (length lines)))
     (hash 'type 'none)
     (let ([line (list-ref lines line-n)])
+      (define (entry-from section)
+        (let* ([trimmed (trim (substring line 2 (string-length line)))]
+               [parts (split-whitespace trimmed)]
+               [status (car parts)]
+               [raw-path (trim (substring trimmed
+                                (string-length status)
+                                (string-length trimmed)))])
+          (hash 'type 'entry
+            'section
+            section
+            'status
+            status
+            'path
+            (if (and (eq? section 'staged) (string=? status "R")
+                 (string-contains? raw-path " -> "))
+              (list-ref (split-many raw-path " -> ") 1)
+              raw-path)
+            'raw-path
+            raw-path)))
       (cond
+        ;; Inline diff body lines are never stageable targets.
+        [(starts-with? line "    ") (hash 'type 'diff-line)]
         [(starts-with? line "Unmerged (")
           (hash 'type 'section-header 'section 'unmerged)]
         [(starts-with? line "Unstaged (")
@@ -356,50 +388,33 @@
           (hash 'type 'section-header 'section 'untracked)]
         [(starts-with? line "Recent Commits (")
           (hash 'type 'section-header 'section 'recent-commits)]
-        [(starts-with? line "  ")
+        [(or (starts-with? line "> ") (starts-with? line "v "))
           (let loop ([idx (- line-n 1)])
             (if (< idx 0)
               (hash 'type 'none)
               (let ([prev-line (list-ref lines idx)])
                 (cond
-                  [(starts-with? prev-line "Unmerged (")
-                    (let* ([trimmed (trim line)]
-                           [parts (split-whitespace trimmed)]
-                           [status (car parts)]
-                           [path (trim (substring trimmed (string-length status) (string-length trimmed)))])
-                      (hash 'type 'entry 'section 'unmerged 'status status 'path path))]
-                  [(starts-with? prev-line "Unstaged (")
-                    (let* ([trimmed (trim line)]
-                           [parts (split-whitespace trimmed)]
-                           [status (car parts)]
-                           [path (trim (substring trimmed (string-length status) (string-length trimmed)))])
-                      (hash 'type 'entry 'section 'unstaged 'status status 'path path))]
-                  [(starts-with? prev-line "Staged (")
-                    (let* ([trimmed (trim line)]
-                           [parts (split-whitespace trimmed)]
-                           [status (car parts)]
-                           [raw-path (trim (substring trimmed (string-length status) (string-length trimmed)))]
-                           [path (if (and (string=? status "R") (string-contains? raw-path " -> "))
-                                  (list-ref (split-many raw-path " -> ") 1)
-                                  raw-path)])
-                      (hash 'type 'entry 'section 'staged 'status status 'path path 'raw-path raw-path))]
-                  [(starts-with? prev-line "Untracked (")
-                    (let* ([trimmed (trim line)]
-                           [parts (split-whitespace trimmed)]
-                           [status (car parts)]
-                           [path (trim (substring trimmed (string-length status) (string-length trimmed)))])
-                      (hash 'type 'entry 'section 'untracked 'status "?" 'path path))]
-                  [(starts-with? prev-line "Recent Commits (")
-                    (let* ([trimmed (trim line)]
-                           [parts (split-whitespace trimmed)]
-                           [c-hash (car parts)]
-                           [subj (trim (substring trimmed (string-length c-hash) (string-length trimmed)))])
-                      (hash 'type 'commit 'hash c-hash 'subject subj))]
+                  [(starts-with? prev-line "Unmerged (") (entry-from 'unmerged)]
+                  [(starts-with? prev-line "Unstaged (") (entry-from 'unstaged)]
+                  [(starts-with? prev-line "Staged (") (entry-from 'staged)]
+                  [(starts-with? prev-line "Untracked (") (entry-from 'untracked)]
+                  [(or (starts-with? prev-line "> ")
+                      (starts-with? prev-line "v ")
+                      (starts-with? prev-line "    "))
+                    (loop (- idx 1))]
                   [(and (> (string-length prev-line) 0)
                       (not (starts-with? prev-line "  "))
                       (not (string-contains? prev-line "(")))
                     (hash 'type 'none)]
                   [else (loop (- idx 1))]))))]
+        [(starts-with? line "  ")
+          (let* ([trimmed (trim line)]
+                 [parts (split-whitespace trimmed)]
+                 [c-hash (car parts)]
+                 [subj (trim (substring trimmed
+                              (string-length c-hash)
+                              (string-length trimmed)))])
+            (hash 'type 'commit 'hash c-hash 'subject subj))]
         [else (hash 'type 'none)]))))
 
 ;; Stage the target at cursor
@@ -706,17 +721,26 @@
           (hash 'success #false 'message (hash-ref res2 'stderr))))
       (hash 'success #false 'message (hash-ref res1 'stderr)))))
 
-;; Extract entry path from a line
+;; Extract entry path from a line (fold markers and diff bodies are ignored)
 (define (extract-entry-path line)
-  (let* ([trimmed (trim line)]
-         [parts (split-whitespace trimmed)])
-    (if (null? parts)
-      #false
-      (let* ([status (car parts)]
-             [raw (trim (substring trimmed (string-length status) (string-length trimmed)))])
-        (if (and (string=? status "R") (string-contains? raw " -> "))
-          (list-ref (split-many raw " -> ") 1)
-          raw)))))
+  (cond
+    [(or (starts-with? line "    ") (not (or (starts-with? line "> ")
+                                          (starts-with? line "v ")
+                                          (starts-with? line "  "))))
+      #false]
+    [else
+      (let* ([raw-line (if (or (starts-with? line "> ") (starts-with? line "v "))
+                        (substring line 2 (string-length line))
+                        line)]
+             [trimmed (trim raw-line)]
+             [parts (split-whitespace trimmed)])
+        (if (null? parts)
+          #false
+          (let* ([status (car parts)]
+                 [raw (trim (substring trimmed (string-length status) (string-length trimmed)))])
+            (if (and (string=? status "R") (string-contains? raw " -> "))
+              (list-ref (split-many raw " -> ") 1)
+              raw))))]))
 
 ;; Parse buffer lines into section buckets: staged, unstaged, untracked, unmerged
 (define (parse-buffer-sections lines)
@@ -735,12 +759,15 @@
           [(starts-with? line "Recent Commits (") (set! cur-sec 'recent-commits)]
           [(and (> (string-length line) 0)
               (not (starts-with? line "  "))
+              (not (starts-with? line "> "))
+              (not (starts-with? line "v "))
               (not (starts-with? line "Keys:"))
               (not (starts-with? line "Head:"))
               (not (starts-with? line "Repo:"))
               (not (starts-with? line "Help:")))
             (set! cur-sec 'none)]
-          [(starts-with? line "  ")
+          [(starts-with? line "    ") #f]
+          [(or (starts-with? line "> ") (starts-with? line "v "))
             (let ([path (extract-entry-path line)])
               (when (and path (> (string-length path) 0))
                 (cond

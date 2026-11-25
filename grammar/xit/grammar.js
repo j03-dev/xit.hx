@@ -18,6 +18,7 @@ module.exports = grammar({
           $.section_staged,
           $.section_untracked,
           $.section_recent_commits,
+          $.diff_line,
           $.message_line
         )
       ),
@@ -30,7 +31,7 @@ module.exports = grammar({
       token(
         prec(
           2,
-          /  (s|u|v\/V\/C-j|d|ret|D|O|T|c|C|S|U|P|p|r|:git-save|q)[ \t]{2,}[^\n\r]*/
+          /  (s|u|v\/V\/C-j|d|ret\/tab|o|D|O|T|c|C|S|U|P|p|r|:git-save|q)[ \t]{2,}[^\n\r]*/
         )
       ),
 
@@ -49,7 +50,7 @@ module.exports = grammar({
 
     entry: $ =>
       seq(
-        /[ ]{2}/,
+        choice(/> /, /v /),
         field("status", $.git_status),
         /[ ]{2}/,
         field("path", $.path)
@@ -75,6 +76,12 @@ module.exports = grammar({
     status_untracked: () => /\?/,
 
     path: () => token(/[^\n\r]+/),
+
+    diff_line: $ => choice($.diff_add, $.diff_del, $.diff_context),
+
+    diff_add: () => token(prec(3, /[ ]{4}\+[^\n\r]*/)),
+    diff_del: () => token(prec(3, /[ ]{4}-[^\n\r]*/)),
+    diff_context: () => token(prec(2, /[ ]{4}[^\n\r]*/)),
 
     commit: $ =>
       seq(

@@ -45,6 +45,10 @@
           },
           {
             "type": "SYMBOL",
+            "name": "diff_line"
+          },
+          {
+            "type": "SYMBOL",
             "name": "message_line"
           }
         ]
@@ -90,7 +94,7 @@
         "value": 2,
         "content": {
           "type": "PATTERN",
-          "value": "  (s|u|v\\/V\\/C-j|d|ret|D|O|T|c|C|S|U|P|p|r|:git-save|q)[ \\t]{2,}[^\\n\\r]*"
+          "value": "  (s|u|v\\/V\\/C-j|d|ret\\/tab|o|D|O|T|c|C|S|U|P|p|r|:git-save|q)[ \\t]{2,}[^\\n\\r]*"
         }
       }
     },
@@ -213,8 +217,17 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "PATTERN",
-          "value": "[ ]{2}"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "PATTERN",
+              "value": "> "
+            },
+            {
+              "type": "PATTERN",
+              "value": "v "
+            }
+          ]
         },
         {
           "type": "FIELD",
@@ -304,6 +317,56 @@
       "content": {
         "type": "PATTERN",
         "value": "[^\\n\\r]+"
+      }
+    },
+    "diff_line": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "diff_add"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "diff_del"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "diff_context"
+        }
+      ]
+    },
+    "diff_add": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 3,
+        "content": {
+          "type": "PATTERN",
+          "value": "[ ]{4}\\+[^\\n\\r]*"
+        }
+      }
+    },
+    "diff_del": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 3,
+        "content": {
+          "type": "PATTERN",
+          "value": "[ ]{4}-[^\\n\\r]*"
+        }
+      }
+    },
+    "diff_context": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 2,
+        "content": {
+          "type": "PATTERN",
+          "value": "[ ]{4}[^\\n\\r]*"
+        }
       }
     },
     "commit": {

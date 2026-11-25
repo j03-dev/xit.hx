@@ -24,6 +24,7 @@
   git-unstage-all
   git-discard
   git-open
+  git-fold-toggle
   git-diff
   git-resolve-ours
   git-resolve-theirs
@@ -37,6 +38,7 @@
   git-refresh
   git-close
   git-help
+  git-diff-selection
   git-save
   xit-info
   xit-error
@@ -80,6 +82,7 @@
 (define *xit-commit-finishing?* #false)
 (define *xit-save-hook-registered?* #false)
 (define *xit-remote-busy?* #false)
+(define *xit-expanded-paths* '())
 
 ;; Notifications via notify.hx
 (define (xit-info msg)
@@ -124,7 +127,9 @@
     (let* ([head-info (git-head-info *xit-dir*)]
            [entries (git-status-entries *xit-dir*)]
            [commits (git-recent-commits *xit-dir* 5)]
-           [text-buf (format-status-buffer *xit-dir* head-info entries commits *xit-show-help*)]
+           [text-buf (format-status-buffer *xit-dir* head-info entries commits
+                      *xit-show-help*
+                      *xit-expanded-paths*)]
            [lines (split-many text-buf "\n")]
            [cur-line (or target-line (get-current-line-number))]
            [safe-line (max 0 (min cur-line (- (length lines) 1)))])
@@ -242,6 +247,7 @@
       (cond
         [(string=? subcmd "commit") (git-commit)]
         [(string=? subcmd "diff") (git-diff)]
+        [(string=? subcmd "diff-selection") (git-diff-selection)]
         [(string=? subcmd "push") (git-push)]
         [(string=? subcmd "pull") (git-pull)]
         [(string=? subcmd "status") (Git)]
@@ -443,7 +449,65 @@
           (xit-info "No file under cursor to open")]))))
 
 ;;@doc
-;; Show git diff for file under cursor or entire repository
+;; Toggle the inline diff under the file under cursor (fold/unfold)
+(define (git-fold-toggle)
+  (unless (git-buffer-alive?)
+    (xit-error "No active git buffer"))
+  (when (git-buffer-alive?)
+    (let* ([target (current-buffer-target)]
+           [line (get-current-line-number)]
+           [type (hash-ref target 'type)])
+      (cond
+        [(eq? type 'entry)
+          (let ([path (hash-ref target 'path)])
+            (set! *xit-expanded-paths*
+              (if (member path *xit-expanded-paths*)
+                (filter (lambda (p) (not (string=? p path))) *xit-expanded-paths*)
+                (cons path *xit-expanded-paths*)))
+            (refresh-git-buffer! line))]
+        [(eq? type 'commit) (git-diff)]
+        [else (xit-info "No file under cursor to fold")]))))
+
+;; Show diff text in the *git-diff* buffer, creating it on first use.
+(define (xit-show-diff! diff-text)
+  (if (diff-buffer-alive?)
+    (begin
+      (editor-switch-action! *xit-diff-doc-id* (Action/Replace))
+      (select_all)
+      (replace-selection-with diff-text)
+      (collapse_selection)
+      (helix.goto-line 1)
+      (xit-set-buffer-language! "git-diff" "diff"))
+    (begin
+      (helix.new)
+      (enqueue-thread-local-callback
+        (lambda ()
+          (let* ([view-id (editor-focus)]
+                 [doc-id (editor->doc-id view-id)])
+            (set! *xit-diff-doc-id* doc-id)
+            (set-scratch-buffer-name! XIT-DIFF-BUFFER-NAME)
+            (xit-install-buffer-keymap! XIT-DIFF-BUFFER-NAME XIT-DIFF-KEYMAPS)
+            (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-DIFF-BUFFER-NAME)
+            (insert_string diff-text)
+            (helix.goto-line 1)
+            (xit-set-buffer-language! "git-diff" "diff")))))))
+
+;;@doc
+;; Show the combined diff for every selected file in the git buffer
+(define (git-diff-selection)
+  (unless (git-buffer-alive?)
+    (xit-error "No active git buffer"))
+  (when (git-buffer-alive?)
+    (let* ([targets (filter (lambda (t) (eq? (hash-ref t 'type) 'entry))
+                     (current-selection-targets))]
+           [chunks (filter (lambda (text) (not (string=? (trim text) "")))
+                    (map (lambda (t) (git-diff-target *xit-dir* t)) targets))])
+      (if (null? chunks)
+        (xit-info "No file diff in selection")
+        (xit-show-diff! (string-join chunks "\n"))))))
+
+;;@doc
+;; Show git diff for selected entries, the file under cursor, or the whole repo
 (define (git-diff)
   (unless (git-buffer-alive?)
     (let ([cwd (get-helix-cwd)])
@@ -452,33 +516,15 @@
   (unless *xit-dir*
     (xit-error "Not in a git repository"))
   (when *xit-dir*
-    (let* ([target (if (git-buffer-alive?)
-                    (current-buffer-target)
-                    (hash 'type 'none))]
-           [diff-text (git-diff-target *xit-dir* target)])
-      (if (string=? (trim diff-text) "")
-        (xit-info "No diff to display")
-        (if (diff-buffer-alive?)
-          (begin
-            (editor-switch-action! *xit-diff-doc-id* (Action/Replace))
-            (select_all)
-            (replace-selection-with diff-text)
-            (collapse_selection)
-            (helix.goto-line 1)
-            (xit-set-buffer-language! "git-diff" "diff"))
-          (begin
-            (helix.new)
-            (enqueue-thread-local-callback
-              (lambda ()
-                (let* ([view-id (editor-focus)]
-                       [doc-id (editor->doc-id view-id)])
-                  (set! *xit-diff-doc-id* doc-id)
-                  (set-scratch-buffer-name! XIT-DIFF-BUFFER-NAME)
-                  (xit-install-buffer-keymap! XIT-DIFF-BUFFER-NAME XIT-DIFF-KEYMAPS)
-                  (helix.keymaps.#%add-reverse-mapping (doc-id->usize doc-id) XIT-DIFF-BUFFER-NAME)
-                  (insert_string diff-text)
-                  (helix.goto-line 1)
-                  (xit-set-buffer-language! "git-diff" "diff"))))))))))
+    (if (and (git-buffer-alive?) (> (length (current-selection-line-numbers)) 1))
+      (git-diff-selection)
+      (let* ([target (if (git-buffer-alive?)
+                      (current-buffer-target)
+                      (hash 'type 'none))]
+             [diff-text (git-diff-target *xit-dir* target)])
+        (if (string=? (trim diff-text) "")
+          (xit-info "No diff to display")
+          (xit-show-diff! diff-text))))))
 
 ;; Path used for the Git-like commit editor. --path-format keeps this absolute
 ;; and works for worktrees too.
@@ -759,42 +805,50 @@
 ;; Keymap Definition Hashes (Configurable)
 ;; =============================================================================
 
-(define XIT-KEYMAPS
+;; The same bindings are installed for normal and select mode: Helix uses a
+;; separate keymap once `v` starts a selection, so `s`, `u`, `d` and `D` must be
+;; present in both for the selection workflow to work.
+(define XIT-BUFFER-KEYS
   (hash
-    "normal"
-    (hash
-      "s"
-      ":git-stage"
-      "u"
-      ":git-unstage"
-      "d"
-      ":git-discard"
-      "ret"
-      ":git-open"
-      "D"
-      ":git-diff"
-      "O"
-      ":git-resolve-ours"
-      "T"
-      ":git-resolve-theirs"
-      "c"
-      ":git-commit"
-      "C"
-      ":git-commit-amend"
-      "S"
-      ":git-stage-all"
-      "U"
-      ":git-unstage-all"
-      "P"
-      ":git-push"
-      "p"
-      ":git-pull"
-      "r"
-      ":git-refresh"
-      "q"
-      ":git-close"
-      "?"
-      ":git-help")))
+    "s"
+    ":git-stage"
+    "u"
+    ":git-unstage"
+    "d"
+    ":git-discard"
+    "D"
+    ":git-diff"
+    "ret"
+    ":git-fold-toggle"
+    "tab"
+    ":git-fold-toggle"
+    "o"
+    ":git-open"
+    "O"
+    ":git-resolve-ours"
+    "T"
+    ":git-resolve-theirs"
+    "c"
+    ":git-commit"
+    "C"
+    ":git-commit-amend"
+    "S"
+    ":git-stage-all"
+    "U"
+    ":git-unstage-all"
+    "P"
+    ":git-push"
+    "p"
+    ":git-pull"
+    "r"
+    ":git-refresh"
+    "q"
+    ":git-close"
+    "?"
+    ":git-help"))
+
+(define XIT-KEYMAPS
+  (hash "normal" XIT-BUFFER-KEYS "select" XIT-BUFFER-KEYS))
 
 ;; Esc is deliberately left native here: repeated Esc presses collapse
 ;; selections and clear cursors, and must not abort the commit. Use q to abort.
@@ -806,11 +860,8 @@
       ":git-commit-abort")))
 
 (define XIT-DIFF-KEYMAPS
-  (hash
-    "normal"
-    (hash
-      "q"
-      ":git-close")))
+  (let ([keys (hash "q" ":git-close")])
+    (hash "normal" keys "select" keys)))
 
 ;; Git-like commit: :w on the commit editor saves the message file and commits.
 (define (xit-on-document-saved! doc-id)
