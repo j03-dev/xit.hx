@@ -430,10 +430,6 @@
           }
         },
         {
-          "type": "PATTERN",
-          "value": "[ ]"
-        },
-        {
           "type": "FIELD",
           "name": "subject",
           "content": {
@@ -469,7 +465,7 @@
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "[^\\u200B\\n\\r]+\\u200B"
+        "value": "[^\\u00A0\\n\\r]+\\u00A0"
       }
     },
     "commit_subject": {

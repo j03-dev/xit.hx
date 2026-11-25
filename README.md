@@ -96,9 +96,9 @@ o 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
 The merge subject names the branch that was merged in, and the `← branch`
 decoration on the node row identifies the branch it landed on. Tree-sitter
 gives graph glyphs, hashes, authors and commit messages separate highlight
-captures, so each uses a different color from the active Helix theme. An
-invisible marker separates author from message while keeping the visible gap
-at exactly one space.
+captures, so each uses a different color from the active Helix theme. A
+non-breaking space separates author from message, so the visible gap stays at
+exactly one space.
 
 ### Branch manager
 

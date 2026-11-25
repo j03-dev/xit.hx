@@ -128,7 +128,7 @@
 (define (commit-subject-from-line line)
   (let ([hash (commit-hash-from-line line)]
         [len (string-length line)]
-        [zwsp (integer->char 8203)])
+        [nbsp (integer->char 160)])
     (if hash
       (let ([hash-len (string-length hash)])
         (let loop ([i 0])
@@ -141,8 +141,8 @@
                 (let find-marker ([j 0])
                   (cond
                     [(>= j rest-len) rest]
-                    [(char=? (string-ref rest j) zwsp)
-                      (let ([subject-start (+ j 2)])
+                    [(char=? (string-ref rest j) nbsp)
+                      (let ([subject-start (+ j 1)])
                         (if (< subject-start rest-len)
                           (substring rest subject-start rest-len)
                           ""))]
@@ -463,8 +463,7 @@
                          (hash-ref commit 'hash)
                          " "
                          (hash-ref commit 'author)
-                         (string (integer->char 8203))
-                         " "
+                         (string (integer->char 160))
                          (hash-ref commit 'subject)
                          (if (string=? decoration "")
                            ""

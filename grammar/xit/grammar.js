@@ -95,7 +95,6 @@ module.exports = grammar({
         field("hash", $.commit_hash),
         /[ ]/,
         field("author", $.commit_author),
-        /[ ]/,
         field("subject", $.commit_subject)
       ),
 
@@ -103,7 +102,7 @@ module.exports = grammar({
 
     graph_prefix: () => token(/[*o|\\\/ ]+/),
     commit_hash: () => token(/[0-9a-f]{7,40}/),
-    commit_author: () => token(/[^\u200B\n\r]+\u200B/),
+    commit_author: () => token(/[^\u00A0\n\r]+\u00A0/),
     commit_subject: () => token(/[^\n\r]+/),
 
     branch_line: () =>

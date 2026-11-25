@@ -7,14 +7,14 @@
 #endif
 
 #define LANGUAGE_VERSION 15
-#define STATE_COUNT 28
+#define STATE_COUNT 27
 #define LARGE_STATE_COUNT 4
 #define SYMBOL_COUNT 47
 #define ALIAS_COUNT 0
 #define TOKEN_COUNT 33
 #define EXTERNAL_TOKEN_COUNT 0
 #define FIELD_COUNT 6
-#define MAX_ALIAS_SEQUENCE_LENGTH 6
+#define MAX_ALIAS_SEQUENCE_LENGTH 5
 #define MAX_RESERVED_WORD_SET_SIZE 0
 #define PRODUCTION_ID_COUNT 4
 #define SUPERTYPE_COUNT 0
@@ -394,7 +394,7 @@ static const TSFieldMapEntry ts_field_map_entries[] = {
     {field_author, 3},
     {field_graph, 0},
     {field_hash, 1},
-    {field_subject, 5},
+    {field_subject, 4},
 };
 
 static const TSSymbol ts_alias_sequences[PRODUCTION_ID_COUNT][MAX_ALIAS_SEQUENCE_LENGTH] = {
@@ -433,7 +433,6 @@ static const TSStateId ts_primary_state_ids[STATE_COUNT] = {
   [24] = 24,
   [25] = 25,
   [26] = 26,
-  [27] = 27,
 };
 
 static bool ts_lex(TSLexer *lexer, TSStateId state) {
@@ -601,8 +600,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == '\n') SKIP(14);
       if (lookahead != 0 &&
           lookahead != '\r' &&
+          lookahead != 0xa0 &&
           lookahead != 0x17f &&
-          lookahead != 0x200b &&
           lookahead != 0x212a) ADVANCE(42);
       END_STATE();
     case 15:
@@ -843,7 +842,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == ' ') ADVANCE(71);
       END_STATE();
     case 42:
-      if (lookahead == 0x200b) ADVANCE(155);
+      if (lookahead == 0xa0) ADVANCE(155);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -2923,11 +2922,10 @@ static const TSLexerMode ts_lex_modes[STATE_COUNT] = {
   [20] = {.lex_state = 13},
   [21] = {.lex_state = 13},
   [22] = {.lex_state = 0},
-  [23] = {.lex_state = 14},
-  [24] = {.lex_state = 12},
-  [25] = {.lex_state = 0},
-  [26] = {.lex_state = 0},
-  [27] = {.lex_state = 12},
+  [23] = {.lex_state = 12},
+  [24] = {.lex_state = 0},
+  [25] = {.lex_state = 14},
+  [26] = {.lex_state = 12},
 };
 
 static const uint16_t ts_parse_table[LARGE_STATE_COUNT][SYMBOL_COUNT] = {
@@ -3439,7 +3437,7 @@ static const uint16_t ts_small_parse_table[] = {
       sym_diff_add,
       sym_diff_del,
   [439] = 3,
-    STATE(27), 1,
+    STATE(26), 1,
       sym_git_status,
     ACTIONS(127), 2,
       sym_status_added,
@@ -3465,18 +3463,15 @@ static const uint16_t ts_small_parse_table[] = {
       ts_builtin_sym_end,
   [472] = 1,
     ACTIONS(135), 1,
-      sym_commit_author,
+      aux_sym_entry_token3,
   [476] = 1,
     ACTIONS(137), 1,
-      aux_sym_entry_token3,
+      aux_sym_commit_token1,
   [480] = 1,
     ACTIONS(139), 1,
-      aux_sym_commit_token1,
+      sym_commit_author,
   [484] = 1,
     ACTIONS(141), 1,
-      aux_sym_commit_token1,
-  [488] = 1,
-    ACTIONS(143), 1,
       aux_sym_entry_token3,
 };
 
@@ -3504,7 +3499,6 @@ static const uint32_t ts_small_parse_table_map[] = {
   [SMALL_STATE(24)] = 476,
   [SMALL_STATE(25)] = 480,
   [SMALL_STATE(26)] = 484,
-  [SMALL_STATE(27)] = 488,
 };
 
 static const TSParseActionEntry ts_parse_actions[] = {
@@ -3559,23 +3553,22 @@ static const TSParseActionEntry ts_parse_actions[] = {
   [105] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_entry, 4, 0, 2),
   [107] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_graph_rail_line, 1, 0, 1),
   [109] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_graph_rail_line, 1, 0, 1),
-  [111] = {.entry = {.count = 1, .reusable = true}}, SHIFT(25),
+  [111] = {.entry = {.count = 1, .reusable = true}}, SHIFT(24),
   [113] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_diff_line, 1, 0, 0),
   [115] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_diff_line, 1, 0, 0),
   [117] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_commit_subject, 1, 0, 0),
   [119] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_commit_subject, 1, 0, 0),
-  [121] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_commit, 6, 0, 3),
-  [123] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_commit, 6, 0, 3),
-  [125] = {.entry = {.count = 1, .reusable = true}}, SHIFT(24),
-  [127] = {.entry = {.count = 1, .reusable = false}}, SHIFT(24),
+  [121] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_commit, 5, 0, 3),
+  [123] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_commit, 5, 0, 3),
+  [125] = {.entry = {.count = 1, .reusable = true}}, SHIFT(23),
+  [127] = {.entry = {.count = 1, .reusable = false}}, SHIFT(23),
   [129] = {.entry = {.count = 1, .reusable = true}}, SHIFT(13),
   [131] = {.entry = {.count = 1, .reusable = true}}, SHIFT(17),
   [133] = {.entry = {.count = 1, .reusable = true}},  ACCEPT_INPUT(),
-  [135] = {.entry = {.count = 1, .reusable = true}}, SHIFT(26),
-  [137] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_git_status, 1, 0, 0),
-  [139] = {.entry = {.count = 1, .reusable = true}}, SHIFT(23),
-  [141] = {.entry = {.count = 1, .reusable = true}}, SHIFT(21),
-  [143] = {.entry = {.count = 1, .reusable = true}}, SHIFT(20),
+  [135] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_git_status, 1, 0, 0),
+  [137] = {.entry = {.count = 1, .reusable = true}}, SHIFT(25),
+  [139] = {.entry = {.count = 1, .reusable = true}}, SHIFT(21),
+  [141] = {.entry = {.count = 1, .reusable = true}}, SHIFT(20),
 };
 
 #ifdef __cplusplus
