@@ -430,10 +430,6 @@
           }
         },
         {
-          "type": "SYMBOL",
-          "name": "author_marker"
-        },
-        {
           "type": "PATTERN",
           "value": "[ ]"
         },
@@ -469,18 +465,11 @@
         "value": "[0-9a-f]{7,40}"
       }
     },
-    "author_marker": {
-      "type": "TOKEN",
-      "content": {
-        "type": "PATTERN",
-        "value": "\\u200B"
-      }
-    },
     "commit_author": {
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "[^\\u200B\\n\\r]+"
+        "value": "[^\\u200B\\n\\r]+\\u200B"
       }
     },
     "commit_subject": {

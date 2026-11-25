@@ -652,7 +652,7 @@
         (emit! "  s        Stage file/section, or every file in selection")
         (emit! "  u        Unstage file/section, or every file in selection")
         (emit! "  v/V/C-j  Select line(s), then s to stage, u to unstage, D to discard")
-        (emit! "  D        Discard file/section/selection (confirm y)")
+        (emit! "  D        Discard file/section/selection")
         (emit! "  ret/tab  Fold/unfold file diff (or show commit diff)")
         (emit! "  o        Open file in editor")
         (emit! "  :git-diff Show diff buffer (all selected files when a selection is active)")
@@ -670,7 +670,7 @@
         (emit! "  q        Close git buffer")
         (emit! ""))
       (begin
-        (emit! "Keys:    [s] stage  [u] unstage  [D] discard (confirm y)  [b] branches  [ret] fold diff  [?] help")
+        (emit! "Keys:    [s] stage  [u] unstage  [D] discard  [b] branches  [ret] fold diff  [?] help")
         (emit! "")))
 
     ;; Unmerged (Conflicts)
@@ -745,10 +745,10 @@
     (emit! "")
     (if show-help?
       (begin
-        (emit! "Keys:    [ret] checkout  [tab] diff  [n] new  [N] new from selected")
-        (emit! "Keys:    [D] delete (confirm y)  [m] merge  [g] graph")
-        (emit! "Keys:    [p] pull  [P] push  [r] refresh  [q] close  [?] hide help"))
-      (emit! "Keys:    [ret] checkout  [tab] diff  [n] new  [N] from  [D] delete  [m] merge  [g] graph  [?] help"))
+        (emit! "Keys:    [ret] checkout  [tab] diff  [c] create  [M] merge")
+        (emit! "Keys:    [D] delete  [g] graph  [p] pull  [P] push")
+        (emit! "Keys:    [r] refresh  [q] close  [?] hide help"))
+      (emit! "Keys:    [ret] checkout  [tab] diff  [c] create  [D] delete  [M] merge  [g] graph  [?] help"))
     (emit! "")
     (emit! (string-append "Branches (" (number->string (length branches)) ")"))
     (let loop ([remaining branches]

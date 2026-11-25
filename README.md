@@ -57,7 +57,7 @@ handled literally, so no manual quoting is needed.
 | Open commit editor | `c` |
 | Commit | type message above the scissors separator, then `:w` (the staged diff below it is display-only) |
 | Abort commit | `q` (Esc stays native and never aborts) |
-| Discard changes / selection | `D`, then `y` to confirm |
+| Discard changes / selection | `D` |
 | View diff in `*git-diff*` | `:git-diff` (or `:Git diff`); selected files via `:git-diff-selection` |
 | Fold / unfold a file's diff inline | `ret` or `tab` |
 | Open file | `o` |
@@ -109,16 +109,16 @@ counts, status, last commit and subject.
 |---|---|
 | Check out branch | `ret` |
 | Diff current branch against selected (`current...selected`) | `tab` |
-| Create and switch to new branch from HEAD | `n` |
-| Create new branch from selected branch and switch | `N` |
-| Safely delete selected branch | `D`, then `y` to confirm |
-| Merge selected branch into current branch | `m` |
+| Create and switch to new branch from selected branch | `c` |
+| Delete selected branch | `D` |
+| Merge selected branch into current branch | `M` |
 | Open full branch graph | `g` |
 | Pull / push | `p` / `P` |
 | Refresh / close / help | `r` / `q` / `?` |
 
-Deleting the current branch is refused. The full graph in `*git-graph*` can be
-refreshed with `r` and closed with `q`.
+Delete and discard require typed confirmation before they run. Deleting the
+current branch is refused. The full graph in `*git-graph*` can be refreshed with
+`r` and closed with `q`.
 
 ## Highlighting
 

@@ -42,8 +42,7 @@
   git-branches
   git-branches-refresh
   git-branches-checkout
-  git-branches-new
-  git-branches-new-from
+  git-branches-create
   git-branches-delete
   git-branches-merge
   git-branches-diff
@@ -760,26 +759,8 @@
   void)
 
 ;;@doc
-;; Create a new branch from HEAD and switch to it
-(define (git-branches-new)
-  (unless *xit-dir*
-    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
-  (when *xit-dir*
-    (push-component!
-      (prompt "New branch name: "
-        (lambda (name)
-          (let ([res (git-branch-create! *xit-dir* name)])
-            (if (hash-ref res 'success)
-              (begin
-                (xit-info (hash-ref res 'message))
-                (xit-refresh-open-buffers!)
-                (xit-reload-all!))
-              (xit-error (hash-ref res 'message))))))))
-  void)
-
-;;@doc
 ;; Create a new branch from the selected branch and switch to it
-(define (git-branches-new-from)
+(define (git-branches-create)
   (unless *xit-dir*
     (set! *xit-dir* (git-repo-root (get-helix-cwd))))
   (when *xit-dir*
@@ -1263,13 +1244,11 @@
     ":git-branches-checkout"
     "tab"
     ":git-branches-diff"
-    "n"
-    ":git-branches-new"
-    "N"
-    ":git-branches-new-from"
+    "c"
+    ":git-branches-create"
     "D"
     ":git-branches-delete"
-    "m"
+    "M"
     ":git-branches-merge"
     "g"
     ":git-branch-graph"

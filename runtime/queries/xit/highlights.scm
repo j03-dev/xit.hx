@@ -63,8 +63,8 @@
 @diff.minus
 
 ;; Commits: graph glyphs, hashes, authors and subjects each use a distinct
-;; capture. A zero-width marker keeps the visible separator at one space while
-;; letting tree-sitter color author and subject independently.
+;; capture. The zero-width marker stays inside the author capture so Helix
+;; keeps one visible space between author and message.
 (graph_prefix)
 @keyword
 (commit_hash)

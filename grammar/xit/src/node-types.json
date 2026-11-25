@@ -43,16 +43,6 @@
           }
         ]
       }
-    },
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "author_marker",
-          "named": true
-        }
-      ]
     }
   },
   {
@@ -324,10 +314,6 @@
         }
       ]
     }
-  },
-  {
-    "type": "author_marker",
-    "named": true
   },
   {
     "type": "branch_line",
