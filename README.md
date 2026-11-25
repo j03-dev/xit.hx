@@ -2,13 +2,9 @@
 
 A Helix-native Git UI written in Steel Scheme.
 
-## Screenshots
+## Screenshot
 
-![xit.hx Git status buffer](images/Screenshot%20from%202026-11-24%2018-18-08.png)
-
-![xit.hx selection workflow](images/Screenshot%20from%202026-11-25%2015-07-14.png)
-
-![xit.hx folded inline diff](images/Screenshot%20from%202026-11-25%2015-07-35.png)
+![xit.hx Git UI](images/Screenshot%20from%202026-11-25%2019-57-55.png)
 
 ## Install
 
