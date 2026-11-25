@@ -50,14 +50,18 @@ All other keys are native Helix or xit buffer keymaps installed automatically.
 | Commit | type message, then `:w` |
 | Abort commit | `q` (Esc stays native and never aborts) |
 | Discard changes | `d`, then `y` to confirm |
-| View diff | `D` |
-| Open file | `ret` |
+| View diff (all selected files when a selection is active) | `D` or `:git-diff` |
+| Fold / unfold a file's diff inline | `ret` or `tab` |
+| Open file | `o` |
 | Refresh status | `r` |
 | Close xit buffer | `q` |
 | Show all keys | `?` |
 
 For selection staging, use normal Helix selection (`v`, `V`, `C-j`, multiple
-cursors) over file lines, then press `s` or `u`.
+cursors) over file lines, then press `s` or `u`. The same selection works with
+`D` to show the combined diff of the selected files. A folded file shows `>`
+before its name; press `ret` or `tab` to unfold it into `v` and show its diff
+directly underneath.
 
 More keys in `*git*`: `C` amend commit, `O` / `T` resolve conflicts, `S` / `U`
 stage or unstage all, `P` / `p` push or pull.

@@ -31,6 +31,29 @@
     "fields": {}
   },
   {
+    "type": "diff_line",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "diff_add",
+          "named": true
+        },
+        {
+          "type": "diff_context",
+          "named": true
+        },
+        {
+          "type": "diff_del",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "entry",
     "named": true,
     "fields": {
@@ -205,6 +228,10 @@
       "required": false,
       "types": [
         {
+          "type": "diff_line",
+          "named": true
+        },
+        {
           "type": "head_line",
           "named": true
         },
@@ -249,6 +276,18 @@
   },
   {
     "type": "commit_hash",
+    "named": true
+  },
+  {
+    "type": "diff_add",
+    "named": true
+  },
+  {
+    "type": "diff_context",
+    "named": true
+  },
+  {
+    "type": "diff_del",
     "named": true
   },
   {
