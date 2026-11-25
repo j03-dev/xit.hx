@@ -47,7 +47,7 @@ All other keys are native Helix or xit buffer keymaps installed automatically.
 | Stage file / section / selection | `s` |
 | Unstage file / section / selection | `u` |
 | Open commit editor | `c` |
-| Commit | type message, then `:w` |
+| Commit | type message above the scissors separator, then `:w` (the staged diff below it is display-only) |
 | Abort commit | `q` (Esc stays native and never aborts) |
 | Discard changes | `d`, then `y` to confirm |
 | View diff (all selected files when a selection is active) | `D` or `:git-diff` |
