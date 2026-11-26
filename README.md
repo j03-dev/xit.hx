@@ -112,9 +112,9 @@ counts, status, last commit and subject.
 | Pull / push | `p` / `P` |
 | Refresh / close / help | `r` / `q` / `?` |
 
-Delete and discard require typed confirmation before they run. Deleting the
-current branch is refused. The full graph in `*git-graph*` can be refreshed with
-`r` and closed with `q`.
+Delete and discard require typed confirmation before they run. Branch deletion
+uses `git branch -D`; deleting the current branch is still refused. The full
+graph in `*git-graph*` can be refreshed with `r` and closed with `q`.
 
 ## Highlighting
 
