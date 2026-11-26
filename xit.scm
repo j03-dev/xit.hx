@@ -778,7 +778,7 @@
   void)
 
 ;;@doc
-;; Safely delete the non-current branch under the cursor, after confirmation
+;; Force-delete the non-current branch under the cursor, after confirmation
 (define (git-branches-delete)
   (unless *xit-dir*
     (set! *xit-dir* (git-repo-root (get-helix-cwd))))

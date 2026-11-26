@@ -570,7 +570,7 @@
   (let ([branch (hash-ref (git-head-info dir) 'branch)])
     (if (string=? branch name)
       (hash 'success #false 'message "Cannot delete the current branch")
-      (let ([res (git-exec dir (list "branch" "-d" "--" name))])
+      (let ([res (git-exec dir (list "branch" "-D" "--" name))])
         (if (hash-ref res 'ok)
           (hash 'success #true 'message (string-append "Deleted branch: " name))
           (hash 'success #false 'message (hash-ref res 'stderr)))))))
