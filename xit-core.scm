@@ -87,6 +87,16 @@
         (if (pair? (cdr parts)) (xit-string->number (cadr parts)) 0)]
       [else (loop (cdr parts))])))
 
+;; Keep long author names from pushing the graph column too far right.
+(define max-author-length 19)
+
+(define (display-author name)
+  (if (<= (string-length name) max-author-length)
+    name
+    (string-append
+      (trim-right (substring name 0 (- max-author-length 3)))
+      "...")))
+
 ;; Fixed-width columns used by the branch and commit views.
 (define (pad-right text width)
   (let ([n (string-length text)])
@@ -787,7 +797,8 @@
            [hash-width (max-string-length
                         (map (lambda (c) (hash-ref c 'hash)) commits))]
            [author-width (max-string-length
-                          (map (lambda (c) (hash-ref c 'author)) commits))])
+                          (map (lambda (c) (display-author (hash-ref c 'author)))
+                            commits))])
       (let loop ([remaining commits] [graphs graph-lines] [acc '()])
         (if (null? remaining)
           (reverse acc)
@@ -798,7 +809,8 @@
                  [line (string-append
                         (pad-right (hash-ref commit 'hash) hash-width)
                         " "
-                        (pad-right (hash-ref commit 'author) author-width)
+                        (pad-right (display-author (hash-ref commit 'author))
+                          author-width)
                         nbsp
                         graph
                         nbsp
