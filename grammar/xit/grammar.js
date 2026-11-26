@@ -104,7 +104,7 @@ module.exports = grammar({
 
     graph_rail_line: $ => field("graph", $.graph_prefix),
 
-    graph_prefix: () => token(/[*o|\\\/ ]+/),
+    graph_prefix: () => token(/[*o|│─╮╯\\\/ -]+/),
     commit_hash: () => token(/[0-9a-f]{7,40}/),
     commit_author: () => token(/[^\u00A0\n\r]+\u00A0/),
     commit_subject: () => token(/[^\n\r←]*[^\n\r← ]/),

@@ -380,17 +380,23 @@
         '()))
     '()))
 
-(define (replace-once text old new)
-  (let ([old-len (string-length old)]
-        [len (string-length text)])
-    (let loop ([i 0])
-      (if (> (+ i old-len) len)
-        text
-        (if (string=? (substring text i (+ i old-len)) old)
-          (string-append (substring text 0 i)
-            new
-            (substring text (+ i old-len) len))
-          (loop (+ i 1)))))))
+;; Keep Git's branch lane layout, but use a Unicode `│` rail and bridge the
+;; curved `╮` / `╯` corners with a `─` line so they visibly join. Main-line
+;; commits stay plain `o`, and spaces between lanes stay where Git put them.
+(define (graph-glyph ch)
+  (cond
+    [(char=? ch #\|) "│"]
+    [(char=? ch #\\) "─╮"]
+    [(char=? ch #\/) "─╯"]
+    [(char=? ch #\*) "o"]
+    [else (string ch)]))
+
+(define (unicode-graph text)
+  (let ([len (string-length text)])
+    (let loop ([i 0] [out ""])
+      (if (>= i len)
+        out
+        (loop (+ i 1) (string-append out (graph-glyph (string-ref text i))))))))
 
 (define (string-contains? text needle)
   (let ([needle-len (string-length needle)]
@@ -443,26 +449,21 @@
         (string-append " " decoration)
         (string-append "  ← " name)))))
 
-;; Render every commit as an `o` node, with explicit `|`, `|\` and `| |`
-;; rails. Linear history keeps a `|` on the left of every node after the first,
-;; so the rail reads as one continuous line like in gitui. Commit metadata stays
-;; aligned on the node row.
+;; Render main-line commits as plain `o`. Branch rails use a continuous Unicode
+;; `│` with `─╮` / `─╯` corners and keep Git's original lane spacing.
 (define (commits-display-lines commits)
   (define (prepend-rails rails acc)
     (if (null? rails)
       acc
-      (prepend-rails (cdr rails) (cons (trim (car rails)) acc))))
-  (let loop ([remaining commits] [acc '()] [first? #true])
+      (prepend-rails (cdr rails) (cons (unicode-graph (trim (car rails))) acc))))
+  (let loop ([remaining commits] [acc '()])
     (if (null? remaining)
       (reverse acc)
       (let* ([commit (car remaining)]
              [lines (commit-graph-lines commit)]
              [prior (all-but-last lines)]
              [node-raw (if (null? lines) "o" (car (reverse lines)))]
-             [node-line (replace-once (trim node-raw) "*" "o")]
-             [continuous?
-               (and (not first?) (null? prior) (string=? node-line "o"))]
-             [node-prefix (if continuous? (string-append "| " node-line) node-line)]
+             [node-prefix (unicode-graph (trim node-raw))]
              [decoration (hash-ref commit 'decoration)]
              [node-text (string-append
                          node-prefix
@@ -476,7 +477,7 @@
                            ""
                            (decoration-display decoration)))]
              [with-rails (prepend-rails prior acc)])
-        (loop (cdr remaining) (cons node-text with-rails) #false)))))
+        (loop (cdr remaining) (cons node-text with-rails))))))
 
 (define (commit-display-lines commit)
   (commits-display-lines (list commit)))
