@@ -43,10 +43,46 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "commit_decoration",
+          "named": true
+        }
+      ]
     }
   },
   {
-    "type": "commit_subject",
+    "type": "commit_decoration",
+    "named": true,
+    "fields": {
+      "branch": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "decoration_branch",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "decoration_arrow",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "decoration_branch",
     "named": true,
     "fields": {}
   },
@@ -168,6 +204,10 @@
       "required": true,
       "types": [
         {
+          "type": "diff_line",
+          "named": true
+        },
+        {
           "type": "entry",
           "named": true
         },
@@ -186,6 +226,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "diff_line",
+          "named": true
+        },
         {
           "type": "entry",
           "named": true
@@ -206,6 +250,10 @@
       "required": true,
       "types": [
         {
+          "type": "diff_line",
+          "named": true
+        },
+        {
           "type": "entry",
           "named": true
         },
@@ -224,6 +272,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "diff_line",
+          "named": true
+        },
         {
           "type": "entry",
           "named": true
@@ -250,10 +302,6 @@
         },
         {
           "type": "commit",
-          "named": true
-        },
-        {
-          "type": "diff_line",
           "named": true
         },
         {
@@ -325,6 +373,14 @@
   },
   {
     "type": "commit_hash",
+    "named": true
+  },
+  {
+    "type": "commit_subject",
+    "named": true
+  },
+  {
+    "type": "decoration_arrow",
     "named": true
   },
   {

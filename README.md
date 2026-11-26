@@ -91,11 +91,15 @@ o 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
 ```
 
 The merge subject names the branch that was merged in, and the `← branch`
-decoration on the node row identifies the branch it landed on. Tree-sitter
-gives graph glyphs, hashes, authors and commit messages separate highlight
-captures, so each uses a different color from the active Helix theme. A
-non-breaking space separates author from message, so the visible gap stays at
-exactly one space.
+decoration on the node row identifies the branch it landed on; the branch name
+uses the diff color. Tree-sitter gives graph glyphs, hashes, authors and commit
+messages separate highlight captures, so each uses a different color from the
+active Helix theme. A non-breaking space separates author from message, so the
+visible gap stays at exactly one space.
+
+Unfolding a file's inline diff does not break the surrounding section: later
+files keep their modified/added/deleted colors, and the `M` status letter keeps
+its diff color too.
 
 ### Branch manager
 

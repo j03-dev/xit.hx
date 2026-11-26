@@ -29,7 +29,10 @@
 (section_graph_header)
 @markup.heading
 
-;; Status letters
+;; Status letters. The whole status field is captured first as a fallback so
+;; the M keeps its diff color even if the parser recovers from an inline diff.
+(git_status)
+@diff.delta
 (status_added)
 @diff.plus
 (status_copied)
@@ -62,12 +65,14 @@
 (diff_del)
 @diff.minus
 
-;; Commits: graph glyphs, hashes, authors and subjects each use a distinct
-;; capture. A non-breaking space stays inside the author capture, giving one
-;; visible space while keeping author and message colored independently.
+;; Commits: graph glyphs, hashes, authors, subjects and branch decorations each
+;; use a distinct capture. A non-breaking space stays inside the author capture,
+;; giving one visible space while keeping author and message colored separately.
 (graph_prefix)
 @keyword
 (commit_hash)
 @function
 (commit (commit_author) @type)
 (commit (commit_subject) @string)
+(decoration_branch)
+@diff.plus

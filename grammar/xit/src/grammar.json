@@ -69,10 +69,6 @@
           },
           {
             "type": "SYMBOL",
-            "name": "diff_line"
-          },
-          {
-            "type": "SYMBOL",
             "name": "message_line"
           }
         ]
@@ -132,8 +128,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "entry"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "entry"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "diff_line"
+              }
+            ]
           }
         }
       ]
@@ -148,8 +153,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "entry"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "entry"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "diff_line"
+              }
+            ]
           }
         }
       ]
@@ -164,8 +178,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "entry"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "entry"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "diff_line"
+              }
+            ]
           }
         }
       ]
@@ -180,8 +203,17 @@
         {
           "type": "REPEAT",
           "content": {
-            "type": "SYMBOL",
-            "name": "entry"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "entry"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "diff_line"
+              }
+            ]
           }
         }
       ]
@@ -436,6 +468,18 @@
             "type": "SYMBOL",
             "name": "commit_subject"
           }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "commit_decoration"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -469,6 +513,37 @@
       }
     },
     "commit_subject": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[^\\n\\r←]*[^\\n\\r← ]"
+      }
+    },
+    "commit_decoration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "decoration_arrow"
+        },
+        {
+          "type": "FIELD",
+          "name": "branch",
+          "content": {
+            "type": "SYMBOL",
+            "name": "decoration_branch"
+          }
+        }
+      ]
+    },
+    "decoration_arrow": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PATTERN",
+        "value": "[ ]{2}←[ ]"
+      }
+    },
+    "decoration_branch": {
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",

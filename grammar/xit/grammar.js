@@ -24,7 +24,6 @@ module.exports = grammar({
           $.commit,
           $.graph_rail_line,
           $.branch_line,
-          $.diff_line,
           $.message_line
         )
       ),
@@ -41,10 +40,14 @@ module.exports = grammar({
         )
       ),
 
-    section_unmerged: $ => seq($.section_unmerged_header, repeat($.entry)),
-    section_unstaged: $ => seq($.section_unstaged_header, repeat($.entry)),
-    section_staged: $ => seq($.section_staged_header, repeat($.entry)),
-    section_untracked: $ => seq($.section_untracked_header, repeat($.entry)),
+    section_unmerged: $ =>
+      seq($.section_unmerged_header, repeat(choice($.entry, $.diff_line))),
+    section_unstaged: $ =>
+      seq($.section_unstaged_header, repeat(choice($.entry, $.diff_line))),
+    section_staged: $ =>
+      seq($.section_staged_header, repeat(choice($.entry, $.diff_line))),
+    section_untracked: $ =>
+      seq($.section_untracked_header, repeat(choice($.entry, $.diff_line))),
     section_unmerged_header: $ => token(/Unmerged \([0-9]+\)/),
     section_unstaged_header: $ => token(/Unstaged \([0-9]+\)/),
     section_staged_header: $ => token(/Staged \([0-9]+\)/),
@@ -95,7 +98,8 @@ module.exports = grammar({
         field("hash", $.commit_hash),
         /[ ]/,
         field("author", $.commit_author),
-        field("subject", $.commit_subject)
+        field("subject", $.commit_subject),
+        optional($.commit_decoration)
       ),
 
     graph_rail_line: $ => field("graph", $.graph_prefix),
@@ -103,7 +107,11 @@ module.exports = grammar({
     graph_prefix: () => token(/[*o|\\\/ ]+/),
     commit_hash: () => token(/[0-9a-f]{7,40}/),
     commit_author: () => token(/[^\u00A0\n\r]+\u00A0/),
-    commit_subject: () => token(/[^\n\r]+/),
+    commit_subject: () => token(/[^\n\r←]*[^\n\r← ]/),
+    commit_decoration: $ =>
+      seq($.decoration_arrow, field("branch", $.decoration_branch)),
+    decoration_arrow: () => token(/[ ]{2}←[ ]/),
+    decoration_branch: () => token(/[^\n\r]+/),
 
     branch_line: () =>
       token(prec(3, /(\*|  )[^\n\r]* ↑[0-9]+ ↓[0-9]+ [^\n\r]*/)),
