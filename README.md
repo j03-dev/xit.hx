@@ -79,20 +79,22 @@ The `Head:` line shows the current branch, upstream, ahead/behind counts and
 whether it needs a push or pull. The `Commit Graph` section shows the full
 history of every local branch, with remote-only commits and remote decorations
 hidden. Graph, hash, author and subject use single-space separators. Every
-commit node is drawn as `o`, and linear history keeps a `|` rail on the left of
-each node after the first so the line stays continuous:
+commit node is drawn as `o`. Branch rails use a continuous Unicode `│` with
+bridged curved `─╮` / `─╯` corners, so they stay joined and compact even in
+repositories with many branches:
 
 ```text
+o 20f14f3 FITAHIANA Nomeniavo Joe feat: draw continuous local commit graph rails
 o 3572927 FITAHIANA Nomeniavo Joe fix: preserve status colors with inline diffs
-| o 89cfc2c FITAHIANA Nomeniavo Joe chore: update readme
-| o f7cb6ce FITAHIANA Nomeniavo Joe feat: set origin upstream on first push
-| o c05568a FITAHIANA Nomeniavo Joe Merge branch 'fix/selection-staging-diff'
-|\
-| o 615ec3b FITAHIANA Nomeniavo Joe feat: show staged diff
-o | 7159a13 FITAHIANA Nomeniavo joe fix: selection staging diff (#1)
-| o b33a0a4 FITAHIANA Nomeniavo Joe feat: collapse diff next files
-|/
-| o 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
+o 89cfc2c FITAHIANA Nomeniavo Joe chore: update readme
+o c05568a FITAHIANA Nomeniavo Joe Merge branch 'fix/selection-staging-diff'
+│─╮
+│ o 615ec3b FITAHIANA Nomeniavo Joe feat: show staged diff
+o │ 7159a13 FITAHIANA Nomeniavo joe fix: selection staging diff (#1)
+│ o b33a0a4 FITAHIANA Nomeniavo Joe feat: collapse diff next files
+│ o 5f3d858 FITAHIANA Nomeniavo Joe chore: d for diff D for discard
+│─╯
+o 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
 ```
 
 The merge subject names the branch that was merged in, and the `← branch`
