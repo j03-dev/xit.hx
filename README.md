@@ -4,7 +4,7 @@ A Helix-native Git UI written in Steel Scheme.
 
 ## Screenshot
 
-![xit.hx Git UI](images/Screenshot%20from%202026-11-25%2019-57-55.png)
+![xit.hx Git UI](https://github.com/j03-dev/xit.hx/releases/download/v1/tuto.mp4)
 
 ## Install
 
