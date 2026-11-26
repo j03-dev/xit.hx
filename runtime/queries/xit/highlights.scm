@@ -66,8 +66,8 @@
 @diff.minus
 
 ;; Commits: graph glyphs, hashes, authors, subjects and branch decorations each
-;; use a distinct capture. A non-breaking space stays inside the author capture,
-;; giving one visible space while keeping author and message colored separately.
+;; use a distinct capture. The graph sits after the author, and non-breaking
+;; spaces keep the columns visibly separated while colors stay independent.
 (graph_prefix)
 @keyword
 (commit_hash)

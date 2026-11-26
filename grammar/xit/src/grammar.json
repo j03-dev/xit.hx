@@ -435,14 +435,6 @@
       "members": [
         {
           "type": "FIELD",
-          "name": "graph",
-          "content": {
-            "type": "SYMBOL",
-            "name": "graph_prefix"
-          }
-        },
-        {
-          "type": "FIELD",
           "name": "hash",
           "content": {
             "type": "SYMBOL",
@@ -460,6 +452,18 @@
             "type": "SYMBOL",
             "name": "commit_author"
           }
+        },
+        {
+          "type": "FIELD",
+          "name": "graph",
+          "content": {
+            "type": "SYMBOL",
+            "name": "graph_prefix"
+          }
+        },
+        {
+          "type": "PATTERN",
+          "value": "[\\u00A0]"
         },
         {
           "type": "FIELD",

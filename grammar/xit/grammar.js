@@ -94,10 +94,11 @@ module.exports = grammar({
 
     commit: $ =>
       seq(
-        field("graph", $.graph_prefix),
         field("hash", $.commit_hash),
         /[ ]/,
         field("author", $.commit_author),
+        field("graph", $.graph_prefix),
+        /[\u00A0]/,
         field("subject", $.commit_subject),
         optional($.commit_decoration)
       ),

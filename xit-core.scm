@@ -117,8 +117,8 @@
           [(string=? (substring text i (+ i needle-len)) needle) #true]
           [else (loop (+ i 1))])))))
 
-;; Find the first hex hash in a rendered commit line. Graph glyphs precede it,
-;; so the first 7-40 char hex run is the hash.
+;; Find the first hex hash in a rendered commit line. The hash is the first
+;; column, so the first 7-40 char hex run is the hash.
 (define (commit-hash-from-line line)
   (let ([len (string-length line)])
     (let loop ([i 0])
@@ -145,20 +145,22 @@
           (cond
             [(> (+ i hash-len) len) ""]
             [(string=? (substring line i (+ i hash-len)) hash)
-              (let* ([start (+ i hash-len 1)]
-                     [rest (substring line start len)]
-                     [rest-len (string-length rest)])
-                (let find-marker ([j 0])
-                  (cond
-                    [(>= j rest-len) rest]
-                    [(char=? (string-ref rest j) nbsp)
-                      (let ([subject-start (+ j 1)])
-                        (if (< subject-start rest-len)
-                          (substring rest subject-start rest-len)
-                          ""))]
-                    [else (find-marker (+ j 1))])))]
+              (let find-first ([j (+ i hash-len)])
+                (cond
+                  [(>= j len) ""]
+                  [(char=? (string-ref line j) nbsp)
+                    (let find-second ([k (+ j 1)])
+                      (cond
+                        [(>= k len) ""]
+                        [(char=? (string-ref line k) nbsp)
+                          (if (< (+ k 1) len)
+                            (substring line (+ k 1) len)
+                            "")]
+                        [else (find-second (+ k 1))]))]
+                  [else (find-first (+ j 1))]))]
             [else (loop (+ i 1))])))
       "")))
+
 ;; Execute a git command in the given directory
 (define (git-exec dir args)
   (let ([proc (~> (command "git" (cons "-C" (cons dir args)))
@@ -775,26 +777,31 @@
         (string-append " " decoration)
         (string-append "  ← " name)))))
 
-;; Render `graph hash author subject` with the graph still in its original
-;; leading column. Lazygit's pipe model keeps merge rails joined, and columns
-;; are not padded: the message stays immediately after the author.
+;; Render `hash author graph subject`. Hash and author are padded so the graph
+;; starts in one column; the graph itself is not padded, so the message stays
+;; one visible space after it instead of moving into an aligned column.
 (define (commits-display-lines commits)
   (if (null? commits)
     '()
-    (let ([graph-lines (map render-pipe-set (commit-pipe-sets commits))])
+    (let* ([graph-lines (map render-pipe-set (commit-pipe-sets commits))]
+           [hash-width (max-string-length
+                        (map (lambda (c) (hash-ref c 'hash)) commits))]
+           [author-width (max-string-length
+                          (map (lambda (c) (hash-ref c 'author)) commits))])
       (let loop ([remaining commits] [graphs graph-lines] [acc '()])
         (if (null? remaining)
           (reverse acc)
           (let* ([commit (car remaining)]
                  [graph (car graphs)]
                  [decoration (hash-ref commit 'decoration)]
+                 [nbsp (string (integer->char 160))]
                  [line (string-append
+                        (pad-right (hash-ref commit 'hash) hash-width)
+                        " "
+                        (pad-right (hash-ref commit 'author) author-width)
+                        nbsp
                         graph
-                        " "
-                        (hash-ref commit 'hash)
-                        " "
-                        (hash-ref commit 'author)
-                        (string (integer->char 160))
+                        nbsp
                         (hash-ref commit 'subject)
                         (if (string=? decoration "")
                           ""
