@@ -71,8 +71,9 @@ discard those files. To view a combined diff of a selection, use
 is intentionally unbound; diffs stay accessible via commands and inline folds.
 
 More keys in `*git*`: `C` amend commit, `O` / `T` resolve conflicts, `S` / `U`
-stage or unstage all, `P` / `p` push or pull. Closing with `q`, committing (or
-aborting), and pulling reload all open Helix files from disk.
+stage or unstage all, `P` / `p` push or pull. Pushing a branch with no upstream
+uses `git push -u origin <branch>` when `origin` exists. Closing with `q`,
+committing (or aborting), and pulling reload all open Helix files from disk.
 
 The `Head:` line shows the current branch, upstream, ahead/behind counts and
 whether it needs a push or pull. The `Commit Graph` section shows every commit
