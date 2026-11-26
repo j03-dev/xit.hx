@@ -123,9 +123,10 @@ counts, status, last commit and subject.
 
 Delete and discard require typed confirmation before they run. Branch deletion
 uses `git branch -D`; deleting the current branch is still refused. Merging uses
-`git merge --no-ff --no-edit`, so even a fast-forward merge creates a merge
-commit and the branch stays visible in the graph. The full graph in
-`*git-graph*` can be refreshed with `r` and closed with `q`.
+`git merge --no-ff --no-edit -m "Merge branch '<branch>'"`, so even a
+fast-forward merge creates a merge commit with that message and the branch
+stays visible in the graph. The full graph in `*git-graph*` can be refreshed
+with `r` and closed with `q`.
 
 ## Highlighting
 
