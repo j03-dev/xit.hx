@@ -1104,10 +1104,28 @@
                   (xit-error (if (string=? err "") out err))))))))
       void]))
 
+;; Build push arguments. A branch with no upstream is published to origin with
+;; `-u` so later push/pull work without extra setup.
+(define (git-push-args dir)
+  (let* ([head (git-head-info dir)]
+         [branch (hash-ref head 'branch)]
+         [upstream (hash-ref head 'upstream)]
+         [origin? (hash-ref (git-exec dir '("remote" "get-url" "origin")) 'ok)])
+    (if (and origin?
+         (git-has-commits? dir)
+         (not upstream)
+         (not (string=? branch "HEAD (detached)")))
+      (list "push" "-u" "origin" branch)
+      '("push"))))
+
 ;;@doc
 ;; Push current branch to remote without blocking Helix.
 (define (git-push)
-  (xit-remote! "Push" "Pushing..." "Push done" '("push")))
+  (unless *xit-dir*
+    (set! *xit-dir* (git-repo-root (get-helix-cwd))))
+  (if *xit-dir*
+    (xit-remote! "Push" "Pushing..." "Push done" (git-push-args *xit-dir*))
+    (xit-error "Not in a git repository")))
 
 ;;@doc
 ;; Pull current branch from remote without blocking Helix.
