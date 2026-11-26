@@ -367,7 +367,9 @@
            [fs (string (integer->char 31))]
            [fmt (string-append sep "%h" fs "%an" fs "%s" fs "%d")]
            [args (append
-                  (list "log" "--graph" "--date-order" "--all" "--decorate")
+                  (list "log" "--graph" "--date-order" "--branches"
+                    "--decorate"
+                    "--decorate-refs=refs/heads")
                   (if count
                     (list (string-append "-n" (number->string count)))
                     '())
@@ -442,13 +444,15 @@
         (string-append "  ← " name)))))
 
 ;; Render every commit as an `o` node, with explicit `|`, `|\` and `| |`
-;; rails. Commit metadata stays aligned on the node row.
+;; rails. Linear history keeps a `|` on the left of every node after the first,
+;; so the rail reads as one continuous line like in gitui. Commit metadata stays
+;; aligned on the node row.
 (define (commits-display-lines commits)
   (define (prepend-rails rails acc)
     (if (null? rails)
       acc
       (prepend-rails (cdr rails) (cons (trim (car rails)) acc))))
-  (let loop ([remaining commits] [acc '()])
+  (let loop ([remaining commits] [acc '()] [first? #true])
     (if (null? remaining)
       (reverse acc)
       (let* ([commit (car remaining)]
@@ -456,9 +460,12 @@
              [prior (all-but-last lines)]
              [node-raw (if (null? lines) "o" (car (reverse lines)))]
              [node-line (replace-once (trim node-raw) "*" "o")]
+             [continuous?
+               (and (not first?) (null? prior) (string=? node-line "o"))]
+             [node-prefix (if continuous? (string-append "| " node-line) node-line)]
              [decoration (hash-ref commit 'decoration)]
              [node-text (string-append
-                         node-line
+                         node-prefix
                          " "
                          (hash-ref commit 'hash)
                          " "
@@ -469,7 +476,7 @@
                            ""
                            (decoration-display decoration)))]
              [with-rails (prepend-rails prior acc)])
-        (loop (cdr remaining) (cons node-text with-rails))))))
+        (loop (cdr remaining) (cons node-text with-rails) #false)))))
 
 (define (commit-display-lines commit)
   (commits-display-lines (list commit)))
