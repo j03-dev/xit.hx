@@ -78,29 +78,28 @@ committing (or aborting), and pulling reload all open Helix files from disk.
 The `Head:` line shows the current branch, upstream, ahead/behind counts and
 whether it needs a push or pull. The `Commit Graph` section shows the full
 history of every local branch, with remote-only commits and remote decorations
-hidden. Commit rows keep `graph hash author subject` in that order: the graph
-stays in its leading column, and the message is not aligned into a later column.
-Every commit node is `o`. Lazygit-style pipe cells join merge rails on the same
-row instead of leaving broken spans such as `o ─╮`:
+hidden. Commit rows are `hash author graph subject`; hash and author are padded
+so the graph starts in one column, while the graph itself is not padded so the
+message stays immediately after it. Every commit node is `o`.
+Lazygit-style pipe cells join merge rails instead of leaving broken spans such
+as `o ─╮`:
 
 ```text
-o─╮ c05568a FITAHIANA Nomeniavo Joe Merge branch 'fix/selection-staging-diff'
-│ o 615ec3b FITAHIANA Nomeniavo Joe feat: show staged diff bellow scissors separator
-o │ 7159a13 FITAHIANA Nomeniavo joe fix/selection staging diff (#1)
-│ o b33a0a4 FITAHIANA Nomeniavo Joe feat: collapse diff next files
-│ o 5f3d858 FITAHIANA Nomeniavo Joe chore: d for diff D for discard
-o─╯ 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
+2b2da3c FITAHIANA Nomeniavo Joe o─╮ merge side
+6d314d9 FITAHIANA Nomeniavo Joe │ o side1
+f235837 Lola Lai Kam           o │ main1
+a3b16c2 A                      │ o base
+45c916a Very Long Author Name  o side
 ```
 
 Each lane is drawn with two characters per cell, so a curved `╮` / `╯` is
-connected by a `─` bridge in the same graph prefix. Commit rows use one visible
-space between graph, hash and author; a non-breaking space stays inside the
-author capture so the author and message keep different colors. The merge
-subject names the branch that was merged in, and the `← branch` decoration on
-the node row identifies the branch it landed on; the branch name uses the diff
-color. Tree-sitter gives graph glyphs, hashes, authors and commit messages
-separate highlight captures, so each uses a different color from the active
-Helix theme.
+connected by a `─` bridge in the same graph prefix. Non-breaking spaces keep
+author/graph and graph/message visibly separated while the author stays inside
+its own highlight capture. The merge subject names the branch that was merged
+in, and the `← branch` decoration identifies the branch it landed on; the
+branch name uses the diff color. Tree-sitter gives hashes, authors, graph
+glyphs, commit messages and branch names separate highlight captures, so each
+uses a different color from the active Helix theme.
 
 Unfolding a file's inline diff does not break the surrounding section: later
 files keep their modified/added/deleted colors, and the `M` status letter keeps
