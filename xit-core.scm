@@ -913,7 +913,11 @@
           (hash 'success #false 'message (hash-ref res 'stderr)))))))
 
 (define (git-branch-merge! dir name)
-  (let ([res (git-exec dir (list "merge" "--no-ff" "--no-edit" name))]
+  (let ([res (git-exec dir
+              (list "merge" "--no-ff" "--no-edit"
+                "-m"
+                (string-append "Merge branch '" name "'")
+                name))]
         [conflicts? (not (null? (hash-ref (git-status-entries dir) 'unmerged)))])
     (cond
       [conflicts?
