@@ -78,31 +78,29 @@ committing (or aborting), and pulling reload all open Helix files from disk.
 The `Head:` line shows the current branch, upstream, ahead/behind counts and
 whether it needs a push or pull. The `Commit Graph` section shows the full
 history of every local branch, with remote-only commits and remote decorations
-hidden. Graph, hash, author and subject use single-space separators. Every
-commit node is drawn as `o`. Branch rails use a continuous Unicode `│` with
-bridged curved `─╮` / `─╯` corners, so they stay joined and compact even in
-repositories with many branches:
+hidden. Commit rows keep `graph hash author subject` in that order: the graph
+stays in its leading column, and the message is not aligned into a later column.
+Every commit node is `o`. Lazygit-style pipe cells join merge rails on the same
+row instead of leaving broken spans such as `o ─╮`:
 
 ```text
-o 20f14f3 FITAHIANA Nomeniavo Joe feat: draw continuous local commit graph rails
-o 3572927 FITAHIANA Nomeniavo Joe fix: preserve status colors with inline diffs
-o 89cfc2c FITAHIANA Nomeniavo Joe chore: update readme
-o c05568a FITAHIANA Nomeniavo Joe Merge branch 'fix/selection-staging-diff'
-│─╮
-│ o 615ec3b FITAHIANA Nomeniavo Joe feat: show staged diff
-o │ 7159a13 FITAHIANA Nomeniavo joe fix: selection staging diff (#1)
+o─╮ c05568a FITAHIANA Nomeniavo Joe Merge branch 'fix/selection-staging-diff'
+│ o 615ec3b FITAHIANA Nomeniavo Joe feat: show staged diff bellow scissors separator
+o │ 7159a13 FITAHIANA Nomeniavo joe fix/selection staging diff (#1)
 │ o b33a0a4 FITAHIANA Nomeniavo Joe feat: collapse diff next files
 │ o 5f3d858 FITAHIANA Nomeniavo Joe chore: d for diff D for discard
-│─╯
-o 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
+o─╯ 366547a FITAHIANA Nomeniavo Joe fix: remove esc from xit keybiding
 ```
 
-The merge subject names the branch that was merged in, and the `← branch`
-decoration on the node row identifies the branch it landed on; the branch name
-uses the diff color. Tree-sitter gives graph glyphs, hashes, authors and commit
-messages separate highlight captures, so each uses a different color from the
-active Helix theme. A non-breaking space separates author from message, so the
-visible gap stays at exactly one space.
+Each lane is drawn with two characters per cell, so a curved `╮` / `╯` is
+connected by a `─` bridge in the same graph prefix. Commit rows use one visible
+space between graph, hash and author; a non-breaking space stays inside the
+author capture so the author and message keep different colors. The merge
+subject names the branch that was merged in, and the `← branch` decoration on
+the node row identifies the branch it landed on; the branch name uses the diff
+color. Tree-sitter gives graph glyphs, hashes, authors and commit messages
+separate highlight captures, so each uses a different color from the active
+Helix theme.
 
 Unfolding a file's inline diff does not break the surrounding section: later
 files keep their modified/added/deleted colors, and the `M` status letter keeps

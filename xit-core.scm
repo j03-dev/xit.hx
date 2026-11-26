@@ -107,8 +107,18 @@
       (or (and (>= n 97) (<= n 102))
         (and (>= n 65) (<= n 70))))))
 
-;; Find the first hex hash in a rendered commit line. Graph glyphs and the
-;; author/subject come after it, so the first 7-40 char hex run is the hash.
+(define (string-contains? text needle)
+  (let ([needle-len (string-length needle)]
+        [len (string-length text)])
+    (and (> needle-len 0)
+      (let loop ([i 0])
+        (cond
+          [(> (+ i needle-len) len) #false]
+          [(string=? (substring text i (+ i needle-len)) needle) #true]
+          [else (loop (+ i 1))])))))
+
+;; Find the first hex hash in a rendered commit line. Graph glyphs precede it,
+;; so the first 7-40 char hex run is the hash.
 (define (commit-hash-from-line line)
   (let ([len (string-length line)])
     (let loop ([i 0])
@@ -149,7 +159,6 @@
                     [else (find-marker (+ j 1))])))]
             [else (loop (+ i 1))])))
       "")))
-
 ;; Execute a git command in the given directory
 (define (git-exec dir args)
   (let ([proc (~> (command "git" (cons "-C" (cons dir args)))
@@ -333,42 +342,38 @@
         'unmerged
         '()))))
 
-;; Get all commits with Git's own graph prefix, author and decorations.
-;; Record/unit separators keep graph glyphs out of the commit fields.
-(define (parse-log-graph output sep fs)
-  (let ([chunks (split-many output sep)])
-    (if (null? chunks)
-      '()
-      (let loop ([remaining (cdr chunks)] [carry (car chunks)] [acc '()])
-        (if (null? remaining)
-          (reverse acc)
-          (let* ([lines (split-many (car remaining) "\n")]
-                 [fields (if (pair? lines) (car lines) "")]
-                 [rest-lines (if (pair? lines) (cdr lines) '())]
-                 [parts (split-many fields fs)])
-            (loop (cdr remaining)
-              (string-join rest-lines "\n")
-              (if (>= (length parts) 4)
-                (cons (hash 'graph carry
-                       'hash
-                       (trim (list-ref parts 0))
-                       'author
-                       (trim (list-ref parts 1))
-                       'subject
-                       (trim (list-ref parts 2))
-                       'decoration
-                       (trim (list-ref parts 3)))
-                  acc)
-                acc))))))))
+;; Get all commits with their parents, author, subject and decorations.
+;; Unit separators keep commit fields from colliding with author names.
+(define (parse-commit-log output fs)
+  (let loop ([lines (filter (lambda (l) (> (string-length l) 0))
+                     (split-many output "\n"))]
+             [acc '()])
+    (if (null? lines)
+      (reverse acc)
+      (let ([parts (split-many (car lines) fs)])
+        (loop (cdr lines)
+          (if (>= (length parts) 6)
+            (cons (hash 'full (list-ref parts 0)
+                   'hash
+                   (list-ref parts 1)
+                   'author
+                   (trim (list-ref parts 2))
+                   'parents
+                   (filter (lambda (p) (> (string-length p) 0))
+                     (split-many (list-ref parts 3) " "))
+                   'subject
+                   (trim (list-ref parts 4))
+                   'decoration
+                   (trim (list-ref parts 5)))
+              acc)
+            acc))))))
 
 (define (git-recent-commits dir [count #false])
   (if (git-has-commits? dir)
-    (let* ([sep (string (integer->char 30))]
-           [fs (string (integer->char 31))]
-           [fmt (string-append sep "%h" fs "%an" fs "%s" fs "%d")]
+    (let* ([fs (string (integer->char 31))]
+           [fmt (string-append "%H" fs "%h" fs "%an" fs "%P" fs "%s" fs "%d")]
            [args (append
-                  (list "log" "--graph" "--date-order" "--branches"
-                    "--decorate"
+                  (list "log" "--branches" "--decorate"
                     "--decorate-refs=refs/heads")
                   (if count
                     (list (string-append "-n" (number->string count)))
@@ -376,43 +381,364 @@
                   (list (string-append "--format=" fmt)))]
            [res (git-exec dir args)])
       (if (hash-ref res 'ok)
-        (parse-log-graph (hash-ref res 'stdout) sep fs)
+        (parse-commit-log (hash-ref res 'stdout) fs)
         '()))
     '()))
 
-;; Keep Git's branch lane layout, but use a Unicode `│` rail and bridge the
-;; curved `╮` / `╯` corners with a `─` line so they visibly join. Main-line
-;; commits stay plain `o`, and spaces between lanes stay where Git put them.
-(define (graph-glyph ch)
+;; Rendered commit rows start with their hash.
+(define (commit-line? line)
+  (and (> (string-length line) 0)
+    (hex-char? (string-ref line 0))))
+
+;; The graph renderer follows lazygit's pipe model: a pipe is a connection from
+;; one commit row to the next, and a cell draws the two characters needed to
+;; show how the pipes touch that row.
+(define start-commit-hash "XIT_START")
+(define empty-commit-hash "4b825dc642cb6eb9a060e54bf8d69288fbee4904")
+
+(define (make-pipe from-pos to-pos from-hash to-hash kind)
+  (hash 'from-pos from-pos 'to-pos to-pos
+    'from-hash
+    from-hash
+    'to-hash
+    to-hash
+    'kind
+    kind))
+
+(define (pipe-from-pos p) (hash-ref p 'from-pos))
+(define (pipe-to-pos p) (hash-ref p 'to-pos))
+(define (pipe-from-hash p) (hash-ref p 'from-hash))
+(define (pipe-to-hash p) (hash-ref p 'to-hash))
+(define (pipe-kind p) (hash-ref p 'kind))
+
+(define (kind=? p kind) (eq? (pipe-kind p) kind))
+
+(define (kind-order p)
   (cond
-    [(char=? ch #\|) "│"]
-    [(char=? ch #\\) "─╮"]
-    [(char=? ch #\/) "─╯"]
-    [(char=? ch #\*) "o"]
-    [else (string ch)]))
+    [(kind=? p 'terminates) 0]
+    [(kind=? p 'starts) 1]
+    [else 2]))
 
-(define (unicode-graph text)
-  (let ([len (string-length text)])
-    (let loop ([i 0] [out ""])
-      (if (>= i len)
-        out
-        (loop (+ i 1) (string-append out (graph-glyph (string-ref text i))))))))
+(define (pipe<? a b)
+  (let ([ap (pipe-to-pos a)]
+        [bp (pipe-to-pos b)])
+    (or (< ap bp)
+      (and (= ap bp) (< (kind-order a) (kind-order b))))))
 
-(define (string-contains? text needle)
-  (let ([needle-len (string-length needle)]
-        [len (string-length text)])
-    (and (> needle-len 0)
+(define (insert-pipe p sorted)
+  (cond
+    [(null? sorted) (list p)]
+    [(pipe<? p (car sorted)) (cons p sorted)]
+    [else (cons (car sorted) (insert-pipe p (cdr sorted)))]))
+
+(define (sort-pipes pipes)
+  (let loop ([remaining pipes] [acc '()])
+    (if (null? remaining)
+      acc
+      (loop (cdr remaining) (insert-pipe (car remaining) acc)))))
+
+(define (filter-pipes pred pipes)
+  (cond
+    [(null? pipes) '()]
+    [(pred (car pipes))
+      (cons (car pipes) (filter-pipes pred (cdr pipes)))]
+    [else (filter-pipes pred (cdr pipes))]))
+
+(define (find-pipe pred pipes)
+  (cond
+    [(null? pipes) #false]
+    [(pred (car pipes)) (car pipes)]
+    [else (find-pipe pred (cdr pipes))]))
+
+(define (same-hash? a b)
+  (if (and a b) (string=? a b) #false))
+
+(define (has-pos? positions pos)
+  (if (member pos positions) #true #false))
+
+(define (add-pos positions pos)
+  (if (has-pos? positions pos) positions (cons pos positions)))
+
+(define (max-position pipes best)
+  (if (null? pipes)
+    best
+    (let ([p (car pipes)])
+      (max-position (cdr pipes)
+        (max best (pipe-from-pos p) (pipe-to-pos p))))))
+
+(define (get-next-pipes prev-pipes commit)
+  (let* ([current (filter-pipes
+                   (lambda (p)
+                     (and (not (kind=? p 'terminates))
+                       (not (same-hash? (pipe-to-hash p)
+                             empty-commit-hash))))
+                   prev-pipes)]
+         [max-pos (max-position current -1)]
+         [target (find-pipe
+                  (lambda (p)
+                    (same-hash? (pipe-to-hash p)
+                      (hash-ref commit 'full)))
+                  current)]
+         [pos (if target (pipe-to-pos target) (+ max-pos 1))]
+         [parents (hash-ref commit 'parents)]
+         [to-hash (if (null? parents)
+                   empty-commit-hash
+                   (car parents))]
+         [new-pipes '()]
+         [taken '()]
+         [traversed '()]
+         [traversed-cont '()])
+
+    (define (traverse! from to)
+      (let ([left (min from to)]
+            [right (max from to)])
+        (let loop ([i left])
+          (when (<= i right)
+            (set! traversed (add-pos traversed i))
+            (loop (+ i 1))))
+        (set! taken (add-pos taken to))))
+
+    (define (next-available-continuing)
       (let loop ([i 0])
-        (cond
-          [(> (+ i needle-len) len) #false]
-          [(string=? (substring text i (+ i needle-len)) needle) #true]
-          [else (loop (+ i 1))])))))
+        (if (has-pos? traversed i) (loop (+ i 1)) i)))
 
-(define (commit-graph-lines commit)
-  (let ([graph (hash-ref commit 'graph)])
-    (if (string=? graph "")
-      '()
-      (split-many graph "\n"))))
+    (define (next-available-new)
+      (let loop ([i 0])
+        (if (or (has-pos? taken i) (has-pos? traversed-cont i))
+          (loop (+ i 1))
+          i)))
+
+    (for-each
+      (lambda (p)
+        (when (not (same-hash? (pipe-to-hash p)
+                    (hash-ref commit 'full)))
+          (set! traversed-cont (add-pos traversed-cont (pipe-to-pos p)))))
+      current)
+
+    (set! new-pipes
+      (list (make-pipe pos pos (hash-ref commit 'full) to-hash 'starts)))
+
+    (for-each
+      (lambda (p)
+        (cond
+          [(same-hash? (pipe-to-hash p) (hash-ref commit 'full))
+            (set! new-pipes
+              (append new-pipes
+                (list (make-pipe (pipe-to-pos p) pos
+                       (pipe-from-hash p)
+                       (pipe-to-hash p)
+                       'terminates))))
+            (traverse! (pipe-to-pos p) pos)]
+          [(< (pipe-to-pos p) pos)
+            (let ([available (next-available-continuing)])
+              (set! new-pipes
+                (append new-pipes
+                  (list (make-pipe (pipe-to-pos p) available
+                         (pipe-from-hash p)
+                         (pipe-to-hash p)
+                         'continues))))
+              (traverse! (pipe-to-pos p) available))]))
+      current)
+
+    (when (> (length parents) 1)
+      (for-each
+        (lambda (parent)
+          (let ([available (next-available-new)])
+            (set! new-pipes
+              (append new-pipes
+                (list (make-pipe pos available
+                       (hash-ref commit 'full)
+                       parent
+                       'starts))))
+            (set! taken (add-pos taken available))))
+        (cdr parents)))
+
+    (for-each
+      (lambda (p)
+        (when (and (not (same-hash? (pipe-to-hash p)
+                         (hash-ref commit 'full)))
+               (> (pipe-to-pos p) pos))
+          (let ([last (pipe-to-pos p)])
+            (let loop ([i (pipe-to-pos p)])
+              (when (> i pos)
+                (if (or (has-pos? taken i) (has-pos? traversed i))
+                  #false
+                  (begin
+                    (set! last i)
+                    (loop (- i 1))))))
+            (set! new-pipes
+              (append new-pipes
+                (list (make-pipe (pipe-to-pos p) last
+                       (pipe-from-hash p)
+                       (pipe-to-hash p)
+                       'continues))))
+            (traverse! (pipe-to-pos p) last))))
+      current)
+
+    (sort-pipes new-pipes)))
+
+(define (commit-pipe-sets commits)
+  (if (null? commits)
+    '()
+    (let ([initial (make-pipe 0 0 start-commit-hash
+                    (hash-ref (car commits) 'full)
+                    'starts)])
+      (let loop ([remaining commits] [pipes (list initial)] [acc '()])
+        (if (null? remaining)
+          (reverse acc)
+          (let ([next (get-next-pipes pipes (car remaining))])
+            (loop (cdr remaining) next (cons next acc))))))))
+
+;; A cell keeps the lines touching its top and bottom edges and its left and
+;; right edges. Indexes: up, down, left, right, horizontal, type.
+(define (make-cell) (make-vector 6 0))
+
+(define (cell-up c) (vector-ref c 0))
+(define (cell-down c) (vector-ref c 1))
+(define (cell-left c) (vector-ref c 2))
+(define (cell-right c) (vector-ref c 3))
+(define (cell-type c) (vector-ref c 5))
+
+(define (set-cell-up! c v) (vector-set! c 0 v))
+(define (set-cell-down! c v) (vector-set! c 1 v))
+(define (set-cell-left! c v) (vector-set! c 2 v))
+(define (set-cell-right! c v) (vector-set! c 3 v))
+(define (set-cell-horizontal! c v) (vector-set! c 4 v))
+(define (set-cell-type! c v) (vector-set! c 5 v))
+
+;; 0 = no line, 1 = straight, 2 = bends left, 3 = bends right.
+(define (line-towards pos other)
+  (cond
+    [(< other pos) 2]
+    [(> other pos) 3]
+    [else 1]))
+
+(define (box-chars up down left right)
+  (cond
+    [(and up down left right) (cons "│" "─")]
+    [(and up down left (not right)) (cons "│" " ")]
+    [(and up down (not left) right) (cons "│" "─")]
+    [(and up down (not left) (not right)) (cons "│" " ")]
+    [(and up (not down) left right) (cons "┴" "─")]
+    [(and up (not down) left (not right)) (cons "╯" " ")]
+    [(and up (not down) (not left) right) (cons "╰" "─")]
+    [(and up (not down) (not left) (not right)) (cons "╵" " ")]
+    [(and (not up) down left right) (cons "┬" "─")]
+    [(and (not up) down left (not right)) (cons "╮" " ")]
+    [(and (not up) down (not left) right) (cons "╭" "─")]
+    [(and (not up) down (not left) (not right)) (cons "╷" " ")]
+    [(and (not up) (not down) left right) (cons "─" "─")]
+    [(and (not up) (not down) left (not right)) (cons "─" " ")]
+    [(and (not up) (not down) (not left) right) (cons "╶" "─")]
+    [else (cons " " " ")]))
+
+(define (trim-right text)
+  (let ([len (string-length text)])
+    (let loop ([end len])
+      (if (and (> end 0)
+           (char=? (string-ref text (- end 1)) #\space))
+        (loop (- end 1))
+        (substring text 0 end)))))
+
+(define (make-cells count)
+  (let ([cells (make-vector count 0)])
+    (let loop ([i 0])
+      (when (< i count)
+        (vector-set! cells i (make-cell))
+        (loop (+ i 1))))
+    cells))
+
+(define (render-pipe-set pipes)
+  (let* ([max-pos (max-position pipes 0)]
+         [cells (make-cells (+ max-pos 1))]
+         [commit-pos 0]
+         [start-count 0]
+         [is-merge? #false])
+
+    (define (cell-at i) (vector-ref cells i))
+
+    (define (set-horizontal! i)
+      (let ([c (cell-at i)])
+        (set-cell-horizontal! c 1)
+        (set-cell-left! c 1)
+        (set-cell-right! c 1)))
+
+    (define (render-pipe! p)
+      (let ([left (min (pipe-from-pos p) (pipe-to-pos p))]
+            [right (max (pipe-from-pos p) (pipe-to-pos p))])
+        (when (not (= left right))
+          (let loop ([i (+ left 1)])
+            (when (< i right)
+              (set-horizontal! i)
+              (loop (+ i 1))))
+          (set-cell-right! (cell-at left) 1)
+          (set-cell-left! (cell-at right) 1))
+        (when (or (kind=? p 'starts) (kind=? p 'continues))
+          (set-cell-down! (cell-at (pipe-to-pos p))
+            (line-towards (pipe-to-pos p) (pipe-from-pos p))))
+        (when (or (kind=? p 'terminates) (kind=? p 'continues))
+          (set-cell-up! (cell-at (pipe-from-pos p))
+            (line-towards (pipe-from-pos p) (pipe-to-pos p))))))
+
+    (for-each
+      (lambda (p)
+        (cond
+          [(kind=? p 'starts)
+            (set! start-count (+ start-count 1))
+            (set! commit-pos (pipe-from-pos p))]
+          [(kind=? p 'terminates)
+            (set! commit-pos (pipe-to-pos p))]))
+      pipes)
+    (set! is-merge? (> start-count 1))
+
+    (for-each
+      (lambda (p) (when (kind=? p 'starts) (render-pipe! p)))
+      pipes)
+
+    (for-each
+      (lambda (p)
+        (cond
+          [(not (kind=? p 'starts))
+            (cond
+              [(and (kind=? p 'terminates)
+                  (= (pipe-from-pos p) commit-pos)
+                  (= (pipe-to-pos p) commit-pos))
+                (when (not (same-hash? (pipe-from-hash p)
+                            start-commit-hash))
+                  (set-cell-up! (cell-at commit-pos) 1))]
+              [else (render-pipe! p)])]))
+      pipes)
+
+    (for-each
+      (lambda (p)
+        (when (and (kind=? p 'starts)
+               (same-hash? (pipe-to-hash p) empty-commit-hash))
+          (set-cell-down! (cell-at (pipe-to-pos p)) 0)))
+      pipes)
+
+    (set-cell-type! (cell-at commit-pos) (if is-merge? 2 1))
+
+    (trim-right
+      (let loop ([i 0] [out ""])
+        (if (>= i (vector-length cells))
+          out
+          (let* ([c (cell-at i)]
+                 [chars (box-chars (not (= (cell-up c) 0))
+                         (not (= (cell-down c) 0))
+                         (not (= (cell-left c) 0))
+                         (not (= (cell-right c) 0)))]
+                 [type (cell-type c)]
+                 [first (if (or (= type 1) (= type 2))
+                         "o"
+                         (car chars))]
+                 [second (if (= (cell-right c) 1) "─" " ")])
+            (loop (+ i 1) (string-append out first second))))))))
+
+(define (spaces count)
+  (let loop ([i 0] [out ""])
+    (if (>= i count)
+      out
+      (loop (+ i 1) (string-append out " ")))))
 
 ;; Pull the first useful branch name out of a `git log --decorate` string.
 (define (ref-part-name part)
@@ -449,35 +775,31 @@
         (string-append " " decoration)
         (string-append "  ← " name)))))
 
-;; Render main-line commits as plain `o`. Branch rails use a continuous Unicode
-;; `│` with `─╮` / `─╯` corners and keep Git's original lane spacing.
+;; Render `graph hash author subject` with the graph still in its original
+;; leading column. Lazygit's pipe model keeps merge rails joined, and columns
+;; are not padded: the message stays immediately after the author.
 (define (commits-display-lines commits)
-  (define (prepend-rails rails acc)
-    (if (null? rails)
-      acc
-      (prepend-rails (cdr rails) (cons (unicode-graph (trim (car rails))) acc))))
-  (let loop ([remaining commits] [acc '()])
-    (if (null? remaining)
-      (reverse acc)
-      (let* ([commit (car remaining)]
-             [lines (commit-graph-lines commit)]
-             [prior (all-but-last lines)]
-             [node-raw (if (null? lines) "o" (car (reverse lines)))]
-             [node-prefix (unicode-graph (trim node-raw))]
-             [decoration (hash-ref commit 'decoration)]
-             [node-text (string-append
-                         node-prefix
-                         " "
-                         (hash-ref commit 'hash)
-                         " "
-                         (hash-ref commit 'author)
-                         (string (integer->char 160))
-                         (hash-ref commit 'subject)
-                         (if (string=? decoration "")
-                           ""
-                           (decoration-display decoration)))]
-             [with-rails (prepend-rails prior acc)])
-        (loop (cdr remaining) (cons node-text with-rails))))))
+  (if (null? commits)
+    '()
+    (let ([graph-lines (map render-pipe-set (commit-pipe-sets commits))])
+      (let loop ([remaining commits] [graphs graph-lines] [acc '()])
+        (if (null? remaining)
+          (reverse acc)
+          (let* ([commit (car remaining)]
+                 [graph (car graphs)]
+                 [decoration (hash-ref commit 'decoration)]
+                 [line (string-append
+                        graph
+                        " "
+                        (hash-ref commit 'hash)
+                        " "
+                        (hash-ref commit 'author)
+                        (string (integer->char 160))
+                        (hash-ref commit 'subject)
+                        (if (string=? decoration "")
+                          ""
+                          (decoration-display decoration)))])
+            (loop (cdr remaining) (cdr graphs) (cons line acc))))))))
 
 (define (commit-display-lines commit)
   (commits-display-lines (list commit)))
@@ -873,17 +1195,13 @@
                       (not (string-contains? prev-line "(")))
                     (hash 'type 'none)]
                   [else (loop (- idx 1))]))))]
-        [(or (starts-with? line "  ")
-            (starts-with? line "o")
-            (starts-with? line "|"))
+        [(commit-hash-from-line line)
           (let ([c-hash (commit-hash-from-line line)])
-            (if c-hash
-              (hash 'type 'commit
-                'hash
-                c-hash
-                'subject
-                (commit-subject-from-line line))
-              (hash 'type 'none)))]
+            (hash 'type 'commit
+              'hash
+              c-hash
+              'subject
+              (commit-subject-from-line line)))]
         [else (hash 'type 'none)]))))
 
 ;; Stage the target at cursor
@@ -1218,9 +1536,8 @@
               (starts-with? line "Commit Graph ("))
             (set! cur-sec 'recent-commits)]
           [(and (> (string-length line) 0)
+              (not (commit-hash-from-line line))
               (not (starts-with? line "  "))
-              (not (starts-with? line "o"))
-              (not (starts-with? line "|"))
               (not (starts-with? line "> "))
               (not (starts-with? line "v "))
               (not (starts-with? line "Keys:"))

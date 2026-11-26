@@ -495,7 +495,7 @@
       "type": "TOKEN",
       "content": {
         "type": "PATTERN",
-        "value": "[*o|│─╮╯\\\\\\/ -]+"
+        "value": "[*o|│─╮╯╰╭┴┬╷╵╶\\\\\\/ -]+"
       }
     },
     "commit_hash": {

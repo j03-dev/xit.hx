@@ -466,7 +466,7 @@ static const TSStateId ts_primary_state_ids[STATE_COUNT] = {
 
 static const TSCharacterRange sym_graph_prefix_character_set_1[] = {
   {' ', ' '}, {'*', '*'}, {'-', '-'}, {'/', '/'}, {'\\', '\\'}, {'o', 'o'}, {'|', '|'}, {0x2500, 0x2500},
-  {0x2502, 0x2502}, {0x256e, 0x256f},
+  {0x2502, 0x2502}, {0x252c, 0x252c}, {0x2534, 0x2534}, {0x256d, 0x2570}, {0x2575, 0x2577},
 };
 
 static bool ts_lex(TSLexer *lexer, TSStateId state) {
@@ -921,7 +921,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == 'R') ADVANCE(229);
       if (lookahead == 'S') ADVANCE(268);
       if (lookahead == 'U') ADVANCE(251);
-      if (set_contains(sym_graph_prefix_character_set_1, 10, lookahead)) ADVANCE(130);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       if (lookahead != 0 &&
           lookahead != '\r' &&
           lookahead != 0x17f &&
@@ -941,7 +941,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == 'S') ADVANCE(268);
       if (lookahead == 'U') ADVANCE(251);
       if (lookahead == 'v') ADVANCE(175);
-      if (set_contains(sym_graph_prefix_character_set_1, 10, lookahead)) ADVANCE(130);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       if (lookahead != 0 &&
           lookahead != '\r' &&
           lookahead != 0x17f &&
@@ -959,7 +959,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == 'R') ADVANCE(229);
       if (lookahead == 'S') ADVANCE(268);
       if (lookahead == 'U') ADVANCE(251);
-      if (set_contains(sym_graph_prefix_character_set_1, 10, lookahead)) ADVANCE(130);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       if (('0' <= lookahead && lookahead <= '9') ||
           ('a' <= lookahead && lookahead <= 'f')) ADVANCE(285);
       if (lookahead != 0 &&
@@ -979,7 +979,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == 'R') ADVANCE(229);
       if (lookahead == 'S') ADVANCE(268);
       if (lookahead == 'U') ADVANCE(251);
-      if (set_contains(sym_graph_prefix_character_set_1, 10, lookahead)) ADVANCE(130);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       if (lookahead != 0 &&
           lookahead != '\r' &&
           lookahead != 0x17f &&
@@ -1107,20 +1107,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 63:
       ACCEPT_TOKEN(sym_help_line);
-      ADVANCE_MAP(
-        ' ', 63,
-        0x2191, 58,
-        '*', 64,
-        '-', 64,
-        '/', 64,
-        '\\', 64,
-        'o', 64,
-        '|', 64,
-        0x2500, 64,
-        0x2502, 64,
-        0x256e, 64,
-        0x256f, 64,
-      );
+      if (lookahead == ' ') ADVANCE(63);
+      if (lookahead == 0x2191) ADVANCE(58);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(64);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1129,19 +1118,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 64:
       ACCEPT_TOKEN(sym_help_line);
-      ADVANCE_MAP(
-        ' ', 63,
-        '*', 64,
-        '-', 64,
-        '/', 64,
-        '\\', 64,
-        'o', 64,
-        '|', 64,
-        0x2500, 64,
-        0x2502, 64,
-        0x256e, 64,
-        0x256f, 64,
-      );
+      if (lookahead == ' ') ADVANCE(63);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(64);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1297,20 +1275,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 94:
       ACCEPT_TOKEN(sym_diff_del);
-      ADVANCE_MAP(
-        ' ', 94,
-        0x2191, 98,
-        '*', 95,
-        '-', 95,
-        '/', 95,
-        '\\', 95,
-        'o', 95,
-        '|', 95,
-        0x2500, 95,
-        0x2502, 95,
-        0x256e, 95,
-        0x256f, 95,
-      );
+      if (lookahead == ' ') ADVANCE(94);
+      if (lookahead == 0x2191) ADVANCE(98);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(95);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1319,19 +1286,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 95:
       ACCEPT_TOKEN(sym_diff_del);
-      ADVANCE_MAP(
-        ' ', 94,
-        '*', 95,
-        '-', 95,
-        '/', 95,
-        '\\', 95,
-        'o', 95,
-        '|', 95,
-        0x2500, 95,
-        0x2502, 95,
-        0x256e, 95,
-        0x256f, 95,
-      );
+      if (lookahead == ' ') ADVANCE(94);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(95);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1410,21 +1366,11 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 103:
       ACCEPT_TOKEN(sym_diff_context);
-      ADVANCE_MAP(
-        ' ', 104,
-        '+', 92,
-        '-', 95,
-        0x2191, 108,
-        '*', 105,
-        '/', 105,
-        '\\', 105,
-        'o', 105,
-        '|', 105,
-        0x2500, 105,
-        0x2502, 105,
-        0x256e, 105,
-        0x256f, 105,
-      );
+      if (lookahead == ' ') ADVANCE(104);
+      if (lookahead == '+') ADVANCE(92);
+      if (lookahead == '-') ADVANCE(95);
+      if (lookahead == 0x2191) ADVANCE(108);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(105);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1433,20 +1379,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 104:
       ACCEPT_TOKEN(sym_diff_context);
-      ADVANCE_MAP(
-        ' ', 104,
-        0x2191, 108,
-        '*', 105,
-        '-', 105,
-        '/', 105,
-        '\\', 105,
-        'o', 105,
-        '|', 105,
-        0x2500, 105,
-        0x2502, 105,
-        0x256e, 105,
-        0x256f, 105,
-      );
+      if (lookahead == ' ') ADVANCE(104);
+      if (lookahead == 0x2191) ADVANCE(108);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(105);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1455,19 +1390,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 105:
       ACCEPT_TOKEN(sym_diff_context);
-      ADVANCE_MAP(
-        ' ', 104,
-        '*', 105,
-        '-', 105,
-        '/', 105,
-        '\\', 105,
-        'o', 105,
-        '|', 105,
-        0x2500, 105,
-        0x2502, 105,
-        0x256e, 105,
-        0x256f, 105,
-      );
+      if (lookahead == ' ') ADVANCE(104);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(105);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1539,21 +1463,10 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 113:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        '\t', 8,
-        ' ', 115,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == '\t') ADVANCE(8);
+      if (lookahead == ' ') ADVANCE(115);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\t' &&
           lookahead != '\n' &&
@@ -1563,21 +1476,10 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 114:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        '\t', 60,
-        ' ', 63,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == '\t') ADVANCE(60);
+      if (lookahead == ' ') ADVANCE(63);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\t' &&
           lookahead != '\n' &&
@@ -1587,21 +1489,10 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 115:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        '\t', 4,
-        ' ', 114,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == '\t') ADVANCE(4);
+      if (lookahead == ' ') ADVANCE(114);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\t' &&
           lookahead != '\n' &&
@@ -1611,20 +1502,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 116:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        '\t', 9,
-        ' ', 117,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == '\t') ADVANCE(9);
+      if (lookahead == ' ') ADVANCE(117);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\t' &&
           lookahead != '\n' &&
@@ -1634,21 +1514,10 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 117:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        '\t', 11,
-        ' ', 118,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == '\t') ADVANCE(11);
+      if (lookahead == ' ') ADVANCE(118);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\t' &&
           lookahead != '\n' &&
@@ -1658,21 +1527,10 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 118:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        '\t', 2,
-        ' ', 113,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == '\t') ADVANCE(2);
+      if (lookahead == ' ') ADVANCE(113);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\t' &&
           lookahead != '\n' &&
@@ -1682,36 +1540,14 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 119:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 125,
-        '*', 130,
-        '-', 130,
-        '/', 130,
-        '\\', 130,
-        'o', 130,
-        '|', 130,
-        0x2500, 130,
-        0x2502, 130,
-        0x256e, 130,
-        0x256f, 130,
-      );
+      if (lookahead == ' ') ADVANCE(125);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       END_STATE();
     case 120:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 120,
-        0x2191, 181,
-        '*', 121,
-        '-', 121,
-        '/', 121,
-        '\\', 121,
-        'o', 121,
-        '|', 121,
-        0x2500, 121,
-        0x2502, 121,
-        0x256e, 121,
-        0x256f, 121,
-      );
+      if (lookahead == ' ') ADVANCE(120);
+      if (lookahead == 0x2191) ADVANCE(181);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(121);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1720,19 +1556,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 121:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 120,
-        '*', 121,
-        '-', 121,
-        '/', 121,
-        '\\', 121,
-        'o', 121,
-        '|', 121,
-        0x2500, 121,
-        0x2502, 121,
-        0x256e, 121,
-        0x256f, 121,
-      );
+      if (lookahead == ' ') ADVANCE(120);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(121);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1741,20 +1566,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 122:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 103,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == ' ') ADVANCE(103);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1763,39 +1577,17 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 123:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 124,
-        '*', 130,
-        '-', 130,
-        '/', 130,
-        '\\', 130,
-        'o', 130,
-        '|', 130,
-        0x2500, 130,
-        0x2502, 130,
-        0x256e, 130,
-        0x256f, 130,
-      );
+      if (lookahead == ' ') ADVANCE(124);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       END_STATE();
     case 124:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 126,
-        ':', 27,
-        'o', 116,
-        'r', 6,
-        'v', 18,
-        0x2190, 42,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == ' ') ADVANCE(126);
+      if (lookahead == ':') ADVANCE(27);
+      if (lookahead == 'o') ADVANCE(116);
+      if (lookahead == 'r') ADVANCE(6);
+      if (lookahead == 'v') ADVANCE(18);
+      if (lookahead == 0x2190) ADVANCE(42);
       if (lookahead == 'C' ||
           lookahead == 'D' ||
           lookahead == 'O' ||
@@ -1804,6 +1596,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
           ('b' <= lookahead && lookahead <= 'd') ||
           ('p' <= lookahead && lookahead <= 's') ||
           lookahead == 'u') ADVANCE(8);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1812,22 +1605,11 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 125:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 126,
-        ':', 27,
-        'o', 116,
-        'r', 6,
-        'v', 18,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == ' ') ADVANCE(126);
+      if (lookahead == ':') ADVANCE(27);
+      if (lookahead == 'o') ADVANCE(116);
+      if (lookahead == 'r') ADVANCE(6);
+      if (lookahead == 'v') ADVANCE(18);
       if (lookahead == 'C' ||
           lookahead == 'D' ||
           lookahead == 'O' ||
@@ -1836,6 +1618,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
           ('b' <= lookahead && lookahead <= 'd') ||
           ('p' <= lookahead && lookahead <= 's') ||
           lookahead == 'u') ADVANCE(8);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1844,20 +1627,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 126:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 126,
-        0x2191, 37,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == ' ') ADVANCE(126);
+      if (lookahead == 0x2191) ADVANCE(37);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1866,19 +1638,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 127:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 126,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        'o', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == ' ') ADVANCE(126);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1887,22 +1648,11 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 128:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 122,
-        ':', 27,
-        'o', 116,
-        'r', 6,
-        'v', 18,
-        '*', 127,
-        '-', 127,
-        '/', 127,
-        '\\', 127,
-        '|', 127,
-        0x2500, 127,
-        0x2502, 127,
-        0x256e, 127,
-        0x256f, 127,
-      );
+      if (lookahead == ' ') ADVANCE(122);
+      if (lookahead == ':') ADVANCE(27);
+      if (lookahead == 'o') ADVANCE(116);
+      if (lookahead == 'r') ADVANCE(6);
+      if (lookahead == 'v') ADVANCE(18);
       if (lookahead == 'C' ||
           lookahead == 'D' ||
           lookahead == 'O' ||
@@ -1911,6 +1661,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
           ('b' <= lookahead && lookahead <= 'd') ||
           ('p' <= lookahead && lookahead <= 's') ||
           lookahead == 'u') ADVANCE(8);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(127);
       if (lookahead != 0 &&
           lookahead != '\n' &&
           lookahead != '\r' &&
@@ -1919,35 +1670,12 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 129:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 128,
-        '*', 130,
-        '-', 130,
-        '/', 130,
-        '\\', 130,
-        'o', 130,
-        '|', 130,
-        0x2500, 130,
-        0x2502, 130,
-        0x256e, 130,
-        0x256f, 130,
-      );
+      if (lookahead == ' ') ADVANCE(128);
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       END_STATE();
     case 130:
       ACCEPT_TOKEN(sym_graph_prefix);
-      ADVANCE_MAP(
-        ' ', 130,
-        '*', 130,
-        '-', 130,
-        '/', 130,
-        '\\', 130,
-        'o', 130,
-        '|', 130,
-        0x2500, 130,
-        0x2502, 130,
-        0x256e, 130,
-        0x256f, 130,
-      );
+      if (set_contains(sym_graph_prefix_character_set_1, 13, lookahead)) ADVANCE(130);
       END_STATE();
     case 131:
       ACCEPT_TOKEN(sym_commit_hash);
