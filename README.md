@@ -87,8 +87,7 @@ as `o ─╮`:
 ```text
 2b2da3c FITAHIANA Nomeni... o─╮ merge side
 6d314d9 FITAHIANA Nomeni... │ o side1
-f235837 Lola Lai Kam       o │ main1
-a3b16c2 A                  │ o base
+a3b16c2 A                   │ o base
 45c916a Very Long Author... o side
 ```
 
