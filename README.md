@@ -85,15 +85,17 @@ Lazygit-style pipe cells join merge rails instead of leaving broken spans such
 as `o ─╮`:
 
 ```text
-2b2da3c FITAHIANA Nomeniavo Joe o─╮ merge side
-6d314d9 FITAHIANA Nomeniavo Joe │ o side1
-f235837 Lola Lai Kam           o │ main1
-a3b16c2 A                      │ o base
-45c916a Very Long Author Name  o side
+2b2da3c FITAHIANA Nomeni... o─╮ merge side
+6d314d9 FITAHIANA Nomeni... │ o side1
+f235837 Lola Lai Kam       o │ main1
+a3b16c2 A                  │ o base
+45c916a Very Long Author... o side
 ```
 
-Each lane is drawn with two characters per cell, so a curved `╮` / `╯` is
-connected by a `─` bridge in the same graph prefix. Non-breaking spaces keep
+Authors longer than 19 characters are shortened to 16 characters plus `...`,
+so `FITAHIANA Nomeniavo Joe` appears as `FITAHIANA Nomeni...`. Each lane is
+drawn with two characters per cell, so a curved `╮` / `╯` is connected by a
+`─` bridge in the same graph prefix. Non-breaking spaces keep
 author/graph and graph/message visibly separated while the author stays inside
 its own highlight capture. The merge subject names the branch that was merged
 in, and the `← branch` decoration identifies the branch it landed on; the
